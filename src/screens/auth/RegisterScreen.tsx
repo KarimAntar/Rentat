@@ -159,7 +159,7 @@ const RegisterScreen: React.FC = () => {
           {/* Title */}
           <View style={styles.titleSection}>
             <Image
-              source={require('../../assets/logo.png')}
+              source={require('../../../assets/logo.png')}
               style={styles.logo}
               resizeMode="contain"
             />
