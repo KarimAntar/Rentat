@@ -98,26 +98,27 @@ const HomeScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
 
-        {/* New Header Design */}
-        <View style={styles.newHeader}>
-          <View style={styles.headerContent}>
-            <View style={styles.greetingSection}>
-              <Text style={styles.greetingText}>
-                {getGreeting()}
-              </Text>
-              <Text style={styles.greetingName}>
-                {getDisplayName()} 👋
-              </Text>
-            </View>
+        {/* Greeting Section - White Background */}
+        <View style={styles.greetingHeader}>
+          <View style={styles.greetingSection}>
+            <Text style={styles.greetingText}>
+              {getGreeting()}
+            </Text>
+            <Text style={styles.greetingName}>
+              {getDisplayName()} 👋
+            </Text>
+          </View>
+        </View>
 
-            <View style={styles.logoSection}>
-              <Image
-                source={require('../../../assets/logo.png')}
-                style={styles.headerLogo}
-                resizeMode="contain"
-              />
-              <Text style={styles.headerBrandText}>Rentat</Text>
-            </View>
+        {/* Logo and Welcome Section - Purple Background */}
+        <View style={styles.logoWelcomeHeader}>
+          <View style={styles.logoSection}>
+            <Image
+              source={require('../../../assets/logo.png')}
+              style={styles.headerLogo}
+              resizeMode="contain"
+            />
+            <Text style={styles.headerBrandText}>Rentat</Text>
           </View>
 
           <View style={styles.welcomeMessageSection}>
@@ -276,6 +277,36 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+
+  // Greeting Header - White Background
+  greetingHeader: {
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+
+  // Logo and Welcome Header - Purple Background
+  logoWelcomeHeader: {
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    backgroundColor: '#e0e7ff',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
 
   // New Header Design
