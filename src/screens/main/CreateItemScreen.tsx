@@ -545,25 +545,47 @@ const CreateItemScreen: React.FC = () => {
 
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Governorate *</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.governorateScroll}>
-          {GOVERNORATES.map((governorate) => (
-            <TouchableOpacity
-              key={governorate.id}
-              style={[
-                styles.governorateButton,
-                formData.governorate === governorate.id && styles.governorateButtonActive
-              ]}
-              onPress={() => setFormData(prev => ({ ...prev, governorate: governorate.id }))}
-            >
-              <Text style={[
-                styles.governorateButtonText,
-                formData.governorate === governorate.id && styles.governorateButtonTextActive
-              ]}>
-                {governorate.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {Platform.OS === 'web' ? (
+          <View style={styles.governorateGrid}>
+            {GOVERNORATES.map((governorate) => (
+              <TouchableOpacity
+                key={governorate.id}
+                style={[
+                  styles.governorateGridItem,
+                  formData.governorate === governorate.id && styles.governorateButtonActive
+                ]}
+                onPress={() => setFormData(prev => ({ ...prev, governorate: governorate.id }))}
+              >
+                <Text style={[
+                  styles.governorateButtonText,
+                  formData.governorate === governorate.id && styles.governorateButtonTextActive
+                ]}>
+                  {governorate.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.governorateScroll}>
+            {GOVERNORATES.map((governorate) => (
+              <TouchableOpacity
+                key={governorate.id}
+                style={[
+                  styles.governorateButton,
+                  formData.governorate === governorate.id && styles.governorateButtonActive
+                ]}
+                onPress={() => setFormData(prev => ({ ...prev, governorate: governorate.id }))}
+              >
+                <Text style={[
+                  styles.governorateButtonText,
+                  formData.governorate === governorate.id && styles.governorateButtonTextActive
+                ]}>
+                  {governorate.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
         {errors.governorate && <Text style={styles.errorText}>{errors.governorate}</Text>}
       </View>
 
@@ -1036,6 +1058,21 @@ const styles = StyleSheet.create({
   },
   governorateButtonTextActive: {
     color: '#FFFFFF',
+  },
+  governorateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 8,
+  },
+  governorateGridItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: 100,
   },
   conditionList: {
     gap: 8,

@@ -608,6 +608,7 @@ export type RootStackParamList = {
   ItemDetails: { itemId: string };
   CreateItem: undefined;
   EditItem: { itemId: string };
+  EditProfile: undefined;
   Review: { rentalId: string; reviewType: 'owner-to-renter' | 'renter-to-owner' };
   RentalRequest: { itemId: string };
   Chat: { chatId: string };

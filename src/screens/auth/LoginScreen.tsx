@@ -19,6 +19,7 @@ import Button from '../../components/ui/Button';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { AuthStackParamList } from '../../types';
 import Toast from 'react-native-toast-message';
+import { googleAuthService } from '../../services/googleAuth';
 
 type LoginScreenProps = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -27,6 +28,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const { signIn } = useAuthContext();
@@ -80,6 +82,30 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
   const handleSignUp = () => {
     navigation.navigate('Register');
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      await googleAuthService.signInWithGoogle();
+      // Navigate to home page after successful sign in
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Main' }],
+        })
+      );
+    } catch (error: any) {
+      if (error.message !== 'REDIRECT_IN_PROGRESS') {
+        Toast.show({
+          type: 'error',
+          text1: 'Google Sign In Failed',
+          text2: error.message || 'Please try again',
+        });
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -185,6 +211,23 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               fullWidth
               style={styles.loginButton}
             />
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={handleGoogleSignIn}
+              disabled={loading || googleLoading}
+            >
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
+              <Text style={styles.googleButtonText}>
+                {googleLoading ? 'Signing in...' : 'Continue with Google'}
+              </Text>
+            </TouchableOpacity>
 
             <View style={styles.signUpContainer}>
               <Text style={styles.signUpText}>Don't have an account? </Text>
@@ -305,6 +348,39 @@ const styles = StyleSheet.create({
   signUpLink: {
     fontSize: 14,
     color: '#4639eb',
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginHorizontal: 16,
+    fontWeight: '500',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    color: '#374151',
     fontWeight: '600',
   },
   footer: {

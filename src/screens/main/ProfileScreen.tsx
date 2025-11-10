@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +45,13 @@ const ProfileScreen: React.FC = () => {
   useEffect(() => {
     loadTierInfo();
   }, [user]);
+
+  const handleEditProfile = () => {
+    const parentNavigation = navigation.getParent();
+    if (parentNavigation) {
+      (parentNavigation as any).navigate('EditProfile');
+    }
+  };
 
   const loadTierInfo = async () => {
     if (!user) return;
@@ -136,9 +144,13 @@ const ProfileScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={40} color="#6B7280" />
-          </View>
+          {user?.photoURL ? (
+            <Image source={{ uri: user.photoURL }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={40} color="#6B7280" />
+            </View>
+          )}
           <Text style={styles.name}>Welcome, {displayName}!</Text>
           <Text style={styles.email}>{email}</Text>
           {user && !user.emailVerified && (
@@ -241,7 +253,10 @@ const ProfileScreen: React.FC = () => {
         </View>
 
         <View style={styles.menu}>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={handleEditProfile}
+          >
             <Ionicons name="person-outline" size={24} color="#6B7280" />
             <Text style={styles.menuText}>Edit Profile</Text>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />

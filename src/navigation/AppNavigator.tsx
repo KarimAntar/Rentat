@@ -15,6 +15,7 @@ import HomeScreen from '../screens/main/HomeScreen';
 import SearchScreen from '../screens/main/SearchScreen';
 import ListItemScreen from '../screens/main/ListItemScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import EditProfileScreen from '../screens/main/EditProfileScreen';
 import WalletScreen from '../screens/main/WalletScreen';
 import ReferralScreen from '../screens/main/ReferralScreen';
 import CreateItemScreen from '../screens/main/CreateItemScreen';
@@ -330,6 +331,7 @@ const AppNavigator: React.FC = () => {
         <RootStack.Screen name="Auth" component={AuthNavigator} />
         <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
         <RootStack.Screen name="EditItem" component={EditItemScreen} />
+        <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
         <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
         <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
         <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
