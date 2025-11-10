@@ -30,7 +30,28 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+.env.development
+.env.production
+.env.test
+
+# Firebase service account keys
+*.key.json
+serviceAccountKey.json
+
+# API keys and secrets
+config/keys.js
+config/secrets.js
+
+# Private configuration files
+src/config/private/
+*.pem
+*.key
+*.crt
+*.p12
+*.p8
+*.jks
 
 # typescript
 *.tsbuildinfo
