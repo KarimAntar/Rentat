@@ -101,13 +101,8 @@ const ProfileScreen: React.FC = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      // Navigation will be handled by the auth state change
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Auth' }],
-        })
-      );
+      // Navigate to Auth stack after sign out (allows back navigation)
+      navigation.navigate('Auth');
     } catch (error) {
       console.error('Error signing out:', error);
     }

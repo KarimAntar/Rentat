@@ -185,14 +185,9 @@ const GlobalHeader: React.FC<{ title?: string; navigation?: any }> = ({ title, n
   const handleSignOut = async () => {
     try {
       await signOut();
-      // Force navigation to Auth stack after sign out
+      // Navigate to Auth stack after sign out (allows back navigation)
       if (navigation) {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Auth' }],
-          })
-        );
+        navigation.navigate('Auth');
       }
     } catch (error) {
       console.error('Sign out error:', error);
