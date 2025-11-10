@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/ui/Button';
 import { useAuthContext } from '../../contexts/AuthContext';
@@ -55,7 +56,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     setLoading(true);
     try {
       await signIn(email.trim(), password);
-      // Navigation will be handled by the auth state change
+      // Navigate to home page after successful sign in
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Main' }],
+        })
+      );
     } catch (error: any) {
       Toast.show({
         type: 'error',

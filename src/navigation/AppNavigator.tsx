@@ -182,6 +182,15 @@ const GlobalHeader: React.FC<{ title?: string }> = ({ title }) => {
     return 'Visitor';
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Navigation will be handled by the auth state change
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   return (
     <View style={styles.globalHeader}>
       <View style={styles.greetingSection}>
@@ -196,7 +205,7 @@ const GlobalHeader: React.FC<{ title?: string }> = ({ title }) => {
         <TouchableOpacity style={styles.actionButton}>
           <Ionicons name="notifications-outline" size={24} color="#6B7280" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => signOut()} style={styles.actionButton}>
+        <TouchableOpacity onPress={handleSignOut} style={styles.actionButton}>
           <Ionicons name="log-out-outline" size={24} color="#6B7280" />
         </TouchableOpacity>
       </View>
@@ -310,36 +319,23 @@ const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer linking={linking}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
-          <>
-            <RootStack.Screen
-              name="Main"
-              component={MainNavigator}
-              key="main" // Force reset when user signs in
-            />
-            <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
-            <RootStack.Screen name="EditItem" component={EditItemScreen} />
-            <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
-            <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
-            <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
-            <RootStack.Screen name="RentalRequest" component={require('../screens/main/RentalRequestScreen').default} />
-            <RootStack.Screen name="Verification" component={require('../screens/main/VerificationScreen').default} />
-            <RootStack.Screen name="Map" component={require('../screens/main/MapScreen').default} />
-            <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
-            <RootStack.Screen name="Referral" component={ReferralScreen} />
-            <RootStack.Screen
-              name="EmailVerification"
-              component={EmailVerificationScreen}
-              options={{ headerShown: true, title: 'Verify Email' }}
-            />
-          </>
-        ) : (
-          <RootStack.Screen
-            name="Auth"
-            component={AuthNavigator}
-            key="auth" // Force reset when user signs out
-          />
-        )}
+        <RootStack.Screen name="Main" component={MainNavigator} />
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+        <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
+        <RootStack.Screen name="EditItem" component={EditItemScreen} />
+        <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
+        <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
+        <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
+        <RootStack.Screen name="RentalRequest" component={require('../screens/main/RentalRequestScreen').default} />
+        <RootStack.Screen name="Verification" component={require('../screens/main/VerificationScreen').default} />
+        <RootStack.Screen name="Map" component={require('../screens/main/MapScreen').default} />
+        <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
+        <RootStack.Screen name="Referral" component={ReferralScreen} />
+        <RootStack.Screen
+          name="EmailVerification"
+          component={EmailVerificationScreen}
+          options={{ headerShown: true, title: 'Verify Email' }}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );
