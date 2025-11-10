@@ -21,6 +21,7 @@ import CreateItemScreen from '../screens/main/CreateItemScreen';
 import EditItemScreen from '../screens/main/EditItemScreen';
 import ItemDetailScreen from '../screens/main/ItemDetailScreen';
 import LoadingScreen from '../components/LoadingScreen';
+import PWAInstallPrompt from '../components/PWAInstallPrompt';
 
 // Import navigation types
 import { RootStackParamList, AuthStackParamList, MainTabParamList } from '../types';
@@ -343,6 +344,9 @@ const AppNavigator: React.FC = () => {
           options={{ headerShown: true, title: 'Verify Email' }}
         />
       </RootStack.Navigator>
+
+      {/* PWA Install Prompt - Only shows on Chrome for Android */}
+      <PWAInstallPrompt />
     </NavigationContainer>
   );
 };
