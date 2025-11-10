@@ -33,6 +33,18 @@ const HomeScreen: React.FC = () => {
   const { user } = useAuthContext();
   const { data: featuredItems, loading: featuredLoading, error: featuredError } = useFeaturedItems();
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const getDisplayName = () => {
+    if (user?.displayName) return user.displayName;
+    return 'Visitor';
+  };
+
   const handleItemPress = (itemId: string) => {
     navigation.navigate('ItemDetails', { itemId });
   };
@@ -86,29 +98,28 @@ const HomeScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
 
-        {/* Logo Header */}
-        <View style={styles.logoHeader}>
-          <View style={styles.logoContainer}>
+        {/* New Header Design */}
+        <View style={styles.newHeader}>
+          <View style={styles.greetingSection}>
+            <Text style={styles.greetingText}>
+              {getGreeting()}, {getDisplayName()} 👋
+            </Text>
+          </View>
+
+          <View style={styles.logoSection}>
             <Image
               source={require('../../../assets/logo.png')}
-              style={styles.logo}
+              style={styles.headerLogo}
               resizeMode="contain"
             />
-            <Text style={styles.logoText}>Rentat</Text>
+            <Text style={styles.headerBrandText}>Rentat</Text>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
 
-        {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeTitle}>
-            {user?.displayName ? `Welcome back, ${user.displayName}!` : 'Welcome to Rentat'}
-          </Text>
-          <Text style={styles.welcomeSubtitle}>
-            Discover amazing items to rent in your area
-          </Text>
+          <View style={styles.welcomeMessageSection}>
+            <Text style={styles.welcomeMessage}>
+              Discover amazing items to rent in your area
+            </Text>
+          </View>
         </View>
 
         {/* Quick Actions Grid */}
@@ -260,6 +271,55 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+
+  // New Header Design
+  newHeader: {
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    backgroundColor: '#e0e7ff',
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  greetingSection: {
+    marginBottom: 20,
+  },
+  greetingText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  logoSection: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerLogo: {
+    width: 60,
+    height: 60,
+    marginBottom: 8,
+  },
+  headerBrandText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#4639eb',
+  },
+  welcomeMessageSection: {
+    alignItems: 'center',
+  },
+  welcomeMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 
   // Logo Header
