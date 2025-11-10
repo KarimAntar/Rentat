@@ -6,6 +6,8 @@ import { getFunctions, connectFunctionsEmulator, Functions } from 'firebase/func
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
+console.log("FIREBASE_API_KEY at runtime:", process.env.EXPO_PUBLIC_FIREBASE_API_KEY);
+
 // Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
