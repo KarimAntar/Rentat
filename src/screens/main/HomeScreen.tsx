@@ -100,19 +100,24 @@ const HomeScreen: React.FC = () => {
 
         {/* New Header Design */}
         <View style={styles.newHeader}>
-          <View style={styles.greetingSection}>
-            <Text style={styles.greetingText}>
-              {getGreeting()}, {getDisplayName()} 👋
-            </Text>
-          </View>
+          <View style={styles.headerContent}>
+            <View style={styles.greetingSection}>
+              <Text style={styles.greetingText}>
+                {getGreeting()}
+              </Text>
+              <Text style={styles.greetingName}>
+                {getDisplayName()} 👋
+              </Text>
+            </View>
 
-          <View style={styles.logoSection}>
-            <Image
-              source={require('../../../assets/logo.png')}
-              style={styles.headerLogo}
-              resizeMode="contain"
-            />
-            <Text style={styles.headerBrandText}>Rentat</Text>
+            <View style={styles.logoSection}>
+              <Image
+                source={require('../../../assets/logo.png')}
+                style={styles.headerLogo}
+                resizeMode="contain"
+              />
+              <Text style={styles.headerBrandText}>Rentat</Text>
+            </View>
           </View>
 
           <View style={styles.welcomeMessageSection}>
@@ -277,8 +282,7 @@ const styles = StyleSheet.create({
   newHeader: {
     paddingVertical: 32,
     paddingHorizontal: 20,
-    alignItems: 'center',
-    backgroundColor: '#e0e7ff',
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 20,
     marginTop: 20,
     marginBottom: 20,
@@ -289,14 +293,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  greetingSection: {
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
     marginBottom: 20,
+  },
+  greetingSection: {
+    flex: 1,
   },
   greetingText: {
     fontSize: 24,
     fontWeight: '700',
     color: '#111827',
-    textAlign: 'center',
+  },
+  greetingName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#4639eb',
+    marginTop: 4,
   },
   logoSection: {
     alignItems: 'center',
