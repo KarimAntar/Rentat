@@ -41,7 +41,10 @@ const HomeScreen: React.FC = () => {
   };
 
   const getDisplayName = () => {
-    if (user?.displayName) return user.displayName;
+    if (user?.displayName) {
+      // Return only the first name (before the first space)
+      return user.displayName.split(' ')[0];
+    }
     return 'Visitor';
   };
 
