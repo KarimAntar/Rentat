@@ -4,6 +4,7 @@ import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthContext } from '../contexts/AuthContext';
 
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -23,8 +24,7 @@ import ItemDetailScreen from '../screens/main/ItemDetailScreen';
 // Import navigation types
 import { RootStackParamList, AuthStackParamList, MainTabParamList } from '../types';
 
-// Import auth context
-import { useAuthContext } from '../contexts/AuthContext';
+
 
 // Create navigators
 const RootStack = createStackNavigator<RootStackParamList>();
@@ -166,25 +166,51 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
   );
 };
 
+// Global Header Component
+const GlobalHeader: React.FC<{ title?: string }> = ({ title }) => {
+  const { user, signOut } = useAuthContext();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const getDisplayName = () => {
+    if (user?.displayName) return user.displayName;
+    return 'Visitor';
+  };
+
+  return (
+    <View style={styles.globalHeader}>
+      <View style={styles.greetingSection}>
+        <Text style={styles.greetingText}>
+          {getGreeting()}
+        </Text>
+        <Text style={styles.greetingName}>
+          {getDisplayName()} 👋
+        </Text>
+      </View>
+      <View style={styles.headerActions}>
+        <TouchableOpacity style={styles.actionButton}>
+          <Ionicons name="notifications-outline" size={24} color="#6B7280" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => signOut()} style={styles.actionButton}>
+          <Ionicons name="log-out-outline" size={24} color="#6B7280" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 // Main Tab Navigator
 const MainNavigator: React.FC = () => {
   return (
     <MainTab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        headerStyle: {
-          backgroundColor: '#4639eb',
-          elevation: 4,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-        },
-        headerTintColor: '#FFFFFF',
-        headerTitleStyle: {
-          fontWeight: '700',
-          fontSize: 18,
-        },
+        header: (props) => <GlobalHeader title={props.options.title} />,
       }}
     >
       <MainTab.Screen
@@ -192,8 +218,7 @@ const MainNavigator: React.FC = () => {
         component={HomeScreen}
         options={{
           title: 'Home',
-          headerTitle: 'Rentat',
-          headerShown: false, // Hide header for home screen for cleaner look
+          headerShown: false, // Hide header for home screen since it has its own greeting
         }}
       />
       <MainTab.Screen
@@ -201,7 +226,6 @@ const MainNavigator: React.FC = () => {
         component={SearchScreen}
         options={{
           title: 'Search',
-          headerTitle: 'Find Items'
         }}
       />
       <MainTab.Screen
@@ -209,7 +233,6 @@ const MainNavigator: React.FC = () => {
         component={ListItemScreen}
         options={{
           title: 'Add Item',
-          headerTitle: 'List Your Item'
         }}
       />
       <MainTab.Screen
@@ -217,7 +240,6 @@ const MainNavigator: React.FC = () => {
         component={WalletScreen}
         options={{
           title: 'Wallet',
-          headerTitle: 'My Wallet'
         }}
       />
       <MainTab.Screen
@@ -225,7 +247,6 @@ const MainNavigator: React.FC = () => {
         component={ProfileScreen}
         options={{
           title: 'Profile',
-          headerTitle: 'My Profile'
         }}
       />
     </MainTab.Navigator>
@@ -289,23 +310,36 @@ const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer linking={linking}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        <RootStack.Screen name="Main" component={MainNavigator} />
-        <RootStack.Screen name="Auth" component={AuthNavigator} />
-        <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
-        <RootStack.Screen name="EditItem" component={EditItemScreen} />
-        <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
-        <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
-        <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
-        <RootStack.Screen name="RentalRequest" component={require('../screens/main/RentalRequestScreen').default} />
-        <RootStack.Screen name="Verification" component={require('../screens/main/VerificationScreen').default} />
-        <RootStack.Screen name="Map" component={require('../screens/main/MapScreen').default} />
-        <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
-        <RootStack.Screen name="Referral" component={ReferralScreen} />
-        <RootStack.Screen
-          name="EmailVerification"
-          component={EmailVerificationScreen}
-          options={{ headerShown: true, title: 'Verify Email' }}
-        />
+        {user ? (
+          <>
+            <RootStack.Screen
+              name="Main"
+              component={MainNavigator}
+              key="main" // Force reset when user signs in
+            />
+            <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
+            <RootStack.Screen name="EditItem" component={EditItemScreen} />
+            <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
+            <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
+            <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
+            <RootStack.Screen name="RentalRequest" component={require('../screens/main/RentalRequestScreen').default} />
+            <RootStack.Screen name="Verification" component={require('../screens/main/VerificationScreen').default} />
+            <RootStack.Screen name="Map" component={require('../screens/main/MapScreen').default} />
+            <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
+            <RootStack.Screen name="Referral" component={ReferralScreen} />
+            <RootStack.Screen
+              name="EmailVerification"
+              component={EmailVerificationScreen}
+              options={{ headerShown: true, title: 'Verify Email' }}
+            />
+          </>
+        ) : (
+          <RootStack.Screen
+            name="Auth"
+            component={AuthNavigator}
+            key="auth" // Force reset when user signs out
+          />
+        )}
       </RootStack.Navigator>
     </NavigationContainer>
   );
@@ -336,6 +370,42 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
     textAlign: 'center',
+  },
+  globalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  greetingSection: {
+    flex: 1,
+  },
+  greetingText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  greetingName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#4639eb',
+    marginTop: 4,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  actionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
