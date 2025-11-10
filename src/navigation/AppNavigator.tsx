@@ -20,6 +20,7 @@ import ReferralScreen from '../screens/main/ReferralScreen';
 import CreateItemScreen from '../screens/main/CreateItemScreen';
 import EditItemScreen from '../screens/main/EditItemScreen';
 import ItemDetailScreen from '../screens/main/ItemDetailScreen';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Import navigation types
 import { RootStackParamList, AuthStackParamList, MainTabParamList } from '../types';
@@ -315,8 +316,7 @@ const AppNavigator: React.FC = () => {
   const { user, loading } = useAuthContext();
 
   if (loading) {
-    // TODO: Add proper loading screen
-    return null;
+    return <LoadingScreen />;
   }
 
   return (
