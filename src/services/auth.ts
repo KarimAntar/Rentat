@@ -363,19 +363,30 @@ export class AuthService {
       }
 
       // Update Firebase Auth profile if needed
-      if (updates.displayName || updates.photoURL) {
-        await updateProfile(user, {
-          displayName: updates.displayName || user.displayName,
-          photoURL: updates.photoURL || user.photoURL,
-        });
+      if (updates.displayName !== undefined || updates.photoURL !== undefined) {
+        const profileUpdates: { displayName?: string | null; photoURL?: string | null } = {};
+        
+        if (updates.displayName !== undefined) {
+          profileUpdates.displayName = updates.displayName || null;
+        }
+        
+        if (updates.photoURL !== undefined) {
+          profileUpdates.photoURL = updates.photoURL || null;
+        }
+        
+        console.log('Updating Firebase Auth profile with:', profileUpdates);
+        await updateProfile(user, profileUpdates);
+        
+        // Reload user to ensure the profile is updated
+        await user.reload();
+        console.log('Firebase user reloaded. New photoURL:', user.photoURL);
       }
 
       // Update Firestore document
       const userRef = doc(db, collections.users, user.uid);
-      await updateDoc(userRef, {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
+      const firestoreUpdates = { ...updates, updatedAt: serverTimestamp() };
+      console.log('Updating Firestore with:', firestoreUpdates);
+      await updateDoc(userRef, firestoreUpdates);
 
       // Update local user data
       if (this.currentUser) {
@@ -387,6 +398,7 @@ export class AuthService {
         this.notifyAuthStateListeners(this.currentUser);
       }
     } catch (error) {
+      console.error('Error in updateUserProfile:', error);
       throw handleFirebaseError(error);
     }
   }

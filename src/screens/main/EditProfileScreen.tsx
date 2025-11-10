@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,9 +30,32 @@ const EditProfileScreen: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [profileImage, setProfileImage] = useState<string | undefined>(user?.photoURL || undefined);
   const [imageChanged, setImageChanged] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+
+  useEffect(() => {
+    console.log('User photoURL:', user?.photoURL);
+    if (user?.photoURL) {
+      setProfileImage(user.photoURL);
+    }
+  }, [user?.photoURL]);
 
   const pickImage = async () => {
     try {
+      setShowImageModal(false);
+      
+      // Request permissions
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Toast.show({
+          type: 'error',
+          text1: 'Permission Required',
+          text2: 'Please allow access to your photo library',
+          position: 'top',
+        });
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -41,16 +64,43 @@ const EditProfileScreen: React.FC = () => {
       });
 
       if (!result.canceled && result.assets?.[0]) {
+        console.log('Image picked:', result.assets[0].uri);
         setProfileImage(result.assets[0].uri);
         setImageChanged(true);
+        Toast.show({
+          type: 'success',
+          text1: 'Image Selected',
+          text2: 'Don\'t forget to save your changes',
+          position: 'top',
+        });
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      console.error('Error picking image:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to pick image. Please try again.',
+        position: 'top',
+      });
     }
   };
 
   const takePhoto = async () => {
     try {
+      setShowImageModal(false);
+      
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Toast.show({
+          type: 'error',
+          text1: 'Permission Required',
+          text2: 'Please allow camera access',
+          position: 'top',
+        });
+        return;
+      }
+
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
@@ -60,58 +110,34 @@ const EditProfileScreen: React.FC = () => {
       if (!result.canceled && result.assets?.[0]) {
         setProfileImage(result.assets[0].uri);
         setImageChanged(true);
+        Toast.show({
+          type: 'success',
+          text1: 'Photo Taken',
+          text2: 'Don\'t forget to save your changes',
+          position: 'top',
+        });
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      console.error('Error taking photo:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to take photo. Please try again.',
+        position: 'top',
+      });
     }
   };
 
   const removeImage = () => {
-    Alert.alert(
-      'Remove Profile Picture',
-      'Are you sure you want to remove your profile picture?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            setProfileImage(undefined);
-            setImageChanged(true);
-          },
-        },
-      ]
-    );
-  };
-
-  const showImageOptions = () => {
-    Alert.alert(
-      'Profile Picture',
-      'Choose an option',
-      [
-        {
-          text: 'Take Photo',
-          onPress: takePhoto,
-        },
-        {
-          text: 'Choose from Library',
-          onPress: pickImage,
-        },
-        ...(profileImage
-          ? [
-              {
-                text: 'Remove Photo',
-                onPress: removeImage,
-                style: 'destructive' as const,
-              },
-            ]
-          : []),
-        {
-          text: 'Cancel',
-          style: 'cancel' as const,
-        },
-      ]
-    );
+    setShowImageModal(false);
+    setProfileImage(undefined);
+    setImageChanged(true);
+    Toast.show({
+      type: 'success',
+      text1: 'Profile Picture Removed',
+      text2: 'Don\'t forget to save your changes',
+      position: 'top',
+    });
   };
 
   const handleSave = async () => {
@@ -125,11 +151,13 @@ const EditProfileScreen: React.FC = () => {
       if (imageChanged) {
         if (profileImage && !profileImage.startsWith('http')) {
           // Upload new image
+          console.log('Uploading new profile image...');
           const uploadResult = await StorageService.uploadUserProfileImage(
             profileImage,
             user.uid
           );
           photoURL = uploadResult.url;
+          console.log('Profile image uploaded:', photoURL);
         } else if (!profileImage) {
           // Remove image
           if (user.photoURL) {
@@ -147,6 +175,7 @@ const EditProfileScreen: React.FC = () => {
       }
 
       // Update profile using authService
+      console.log('Updating user profile with photoURL:', photoURL);
       await authService.updateUserProfile({
         displayName: displayName.trim() || user.displayName || undefined,
         photoURL: photoURL || undefined,
@@ -159,8 +188,15 @@ const EditProfileScreen: React.FC = () => {
         position: 'top',
       });
 
-      navigation.goBack();
+      // Reload user to ensure photoURL is updated
+      await user.reload();
+      
+      // Navigate back to Profile screen in the Main tab
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     } catch (error: any) {
+      console.error('Error updating profile:', error);
       Toast.show({
         type: 'error',
         text1: 'Update Failed',
@@ -190,7 +226,7 @@ const EditProfileScreen: React.FC = () => {
           <View style={styles.profileImageSection}>
             <TouchableOpacity
               style={styles.profileImageContainer}
-              onPress={showImageOptions}
+              onPress={() => setShowImageModal(true)}
             >
               {profileImage ? (
                 <Image source={{ uri: profileImage }} style={styles.profileImage} />
@@ -251,6 +287,53 @@ const EditProfileScreen: React.FC = () => {
           />
         </View>
       </KeyboardAvoidingView>
+
+      {/* Image Options Modal */}
+      <Modal
+        visible={showImageModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowImageModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowImageModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Profile Picture</Text>
+              <TouchableOpacity onPress={() => setShowImageModal(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.modalOption} onPress={pickImage}>
+              <Ionicons name="images-outline" size={24} color="#4639eb" />
+              <Text style={styles.modalOptionText}>Choose from Library</Text>
+            </TouchableOpacity>
+
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity style={styles.modalOption} onPress={takePhoto}>
+                <Ionicons name="camera-outline" size={24} color="#4639eb" />
+                <Text style={styles.modalOptionText}>Take Photo</Text>
+              </TouchableOpacity>
+            )}
+
+            {profileImage && (
+              <TouchableOpacity
+                style={[styles.modalOption, styles.modalOptionDanger]}
+                onPress={removeImage}
+              >
+                <Ionicons name="trash-outline" size={24} color="#DC2626" />
+                <Text style={[styles.modalOptionText, styles.modalOptionDangerText]}>
+                  Remove Photo
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -356,6 +439,48 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 0,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#111827',
+    marginLeft: 16,
+  },
+  modalOptionDanger: {
+    backgroundColor: '#FEF2F2',
+  },
+  modalOptionDangerText: {
+    color: '#DC2626',
   },
 });
 
