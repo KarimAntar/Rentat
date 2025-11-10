@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -46,7 +46,18 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "meta": {
+        "og:title": "Rentat - Rent anything, anytime",
+        "og:description": "Find and rent items from verified owners in your area. Secure payments, easy rentals.",
+        "og:image": "./assets/logo.png",
+        "og:url": "https://rentat.vercel.app",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Rentat - Rent anything, anytime",
+        "twitter:description": "Find and rent items from verified owners in your area. Secure payments, easy rentals.",
+        "twitter:image": "./assets/logo.png"
+      }
     },
     "plugins": [
       "expo-notifications",
@@ -66,7 +77,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id-here"
+        "projectId": "3e9915af-857c-4ca8-a93b-8af713308354"
       },
       "useEmulators": false,
       "emulatorHost": "localhost",
@@ -81,10 +92,11 @@
     },
     "updates": {
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/your-project-id"
+      "url": "https://rentat.vercel.app"
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
-    }
+    },
+    "owner": "karrypotter"
   }
 }
