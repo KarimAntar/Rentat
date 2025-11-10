@@ -36,13 +36,39 @@ const AuthNavigator: React.FC = () => {
   return (
     <AuthStack.Navigator
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: '#4639eb',
+          elevation: 4,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        headerTintColor: '#FFFFFF',
+        headerTitleStyle: {
+          fontWeight: '700',
+          fontSize: 18,
+        },
+        headerTitle: 'Rentat',
         cardStyle: { backgroundColor: '#FFFFFF' },
       }}
     >
-      <AuthStack.Screen name="Login" component={LoginScreen} />
-      <AuthStack.Screen name="Register" component={RegisterScreen} />
-      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <AuthStack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{ headerTitle: 'Sign In' }}
+      />
+      <AuthStack.Screen
+        name="Register"
+        component={RegisterScreen}
+        options={{ headerTitle: 'Sign Up' }}
+      />
+      <AuthStack.Screen
+        name="ForgotPassword"
+        component={ForgotPasswordScreen}
+        options={{ headerTitle: 'Reset Password' }}
+      />
     </AuthStack.Navigator>
   );
 };

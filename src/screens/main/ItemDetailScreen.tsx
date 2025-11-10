@@ -67,7 +67,7 @@ const ItemDetailScreen: React.FC = () => {
           setOwner({
             uid: itemData.ownerId,
             email: '',
-            displayName: itemData.ownerId === user?.uid ? 'You' : 'Member',
+            displayName: itemData.ownerId === user?.uid ? 'You' : 'Verified Member',
             location: { latitude: 0, longitude: 0, address: '', city: '', country: '' },
             verification: { isVerified: false, verificationStatus: 'pending' },
             ratings: { asOwner: { average: 0, count: 0 }, asRenter: { average: 0, count: 0 } },
@@ -90,7 +90,7 @@ const ItemDetailScreen: React.FC = () => {
 
   const handleRentRequest = () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to request rentals');
+      (navigation as any).navigate('Auth', { screen: 'Login' });
       return;
     }
     if (item?.ownerId === user.uid) {
@@ -575,7 +575,7 @@ const ItemDetailScreen: React.FC = () => {
               fontSize: 16,
               fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
               boxSizing: 'border-box',
-              marginLeft: 8,
+              marginLeft: 16,
               cursor: item.availability.isAvailable && item.ownerId !== user?.uid ? 'pointer' : 'not-allowed',
               opacity: item.availability.isAvailable && item.ownerId !== user?.uid ? 1 : 0.5,
               overflow: 'hidden',
