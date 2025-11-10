@@ -41,7 +41,7 @@ service cloud.firestore {
     
     // Items collection
     match /items/{itemId} {
-      allow read: if isAuthenticated();
+      allow read: if true; // Allow public read access for browsing listings
       
       allow create: if isAuthenticated() && 
         request.resource.data.ownerId == request.auth.uid;

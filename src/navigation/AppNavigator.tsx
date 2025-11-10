@@ -263,23 +263,28 @@ const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer linking={linking}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        <RootStack.Screen name="Main" component={MainNavigator} />
-        <RootStack.Screen name="Auth" component={AuthNavigator} />
-        <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
-        <RootStack.Screen name="EditItem" component={EditItemScreen} />
-        <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
-        <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
-        <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
-        <RootStack.Screen name="RentalRequest" component={require('../screens/main/RentalRequestScreen').default} />
-        <RootStack.Screen name="Verification" component={require('../screens/main/VerificationScreen').default} />
-        <RootStack.Screen name="Map" component={require('../screens/main/MapScreen').default} />
-        <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
-        <RootStack.Screen name="Referral" component={ReferralScreen} />
-        <RootStack.Screen
-          name="EmailVerification"
-          component={EmailVerificationScreen}
-          options={{ headerShown: true, title: 'Verify Email' }}
-        />
+        {user ? (
+          <>
+            <RootStack.Screen name="Main" component={MainNavigator} />
+            <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
+            <RootStack.Screen name="EditItem" component={EditItemScreen} />
+            <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
+            <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
+            <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
+            <RootStack.Screen name="RentalRequest" component={require('../screens/main/RentalRequestScreen').default} />
+            <RootStack.Screen name="Verification" component={require('../screens/main/VerificationScreen').default} />
+            <RootStack.Screen name="Map" component={require('../screens/main/MapScreen').default} />
+            <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
+            <RootStack.Screen name="Referral" component={ReferralScreen} />
+            <RootStack.Screen
+              name="EmailVerification"
+              component={EmailVerificationScreen}
+              options={{ headerShown: true, title: 'Verify Email' }}
+            />
+          </>
+        ) : (
+          <RootStack.Screen name="Auth" component={AuthNavigator} />
+        )}
       </RootStack.Navigator>
     </NavigationContainer>
   );
