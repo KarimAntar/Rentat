@@ -49,6 +49,8 @@ const AuthNavigator: React.FC = () => {
 
 // Custom Tab Bar Component - Always shows text below icons
 const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
+  const { user } = useAuthContext();
+
   return (
     <View style={styles.tabBarContainer}>
       {state.routes.map((route: any, index: number) => {
@@ -84,6 +86,15 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
           });
 
           if (!isFocused && !event.defaultPrevented) {
+            // Check if user needs to be authenticated for this tab
+            const requiresAuth = ['AddItem', 'Messages', 'Profile'].includes(route.name);
+
+            if (requiresAuth && !user) {
+              // Navigate to auth stack instead of the protected tab
+              navigation.navigate('Auth', { screen: 'Login' });
+              return;
+            }
+
             navigation.navigate(route.name);
           }
         };
@@ -252,28 +263,23 @@ const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer linking={linking}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
-          <>
-            <RootStack.Screen name="Main" component={MainNavigator} />
-            <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
-            <RootStack.Screen name="EditItem" component={EditItemScreen} />
-            <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
-            <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
-            <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
-            <RootStack.Screen name="RentalRequest" component={require('../screens/main/RentalRequestScreen').default} />
-            <RootStack.Screen name="Verification" component={require('../screens/main/VerificationScreen').default} />
-            <RootStack.Screen name="Map" component={require('../screens/main/MapScreen').default} />
-            <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
-            <RootStack.Screen name="Referral" component={ReferralScreen} />
-            <RootStack.Screen
-              name="EmailVerification"
-              component={EmailVerificationScreen}
-              options={{ headerShown: true, title: 'Verify Email' }}
-            />
-          </>
-        ) : (
-          <RootStack.Screen name="Auth" component={AuthNavigator} />
-        )}
+        <RootStack.Screen name="Main" component={MainNavigator} />
+        <RootStack.Screen name="Auth" component={AuthNavigator} />
+        <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
+        <RootStack.Screen name="EditItem" component={EditItemScreen} />
+        <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
+        <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
+        <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
+        <RootStack.Screen name="RentalRequest" component={require('../screens/main/RentalRequestScreen').default} />
+        <RootStack.Screen name="Verification" component={require('../screens/main/VerificationScreen').default} />
+        <RootStack.Screen name="Map" component={require('../screens/main/MapScreen').default} />
+        <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
+        <RootStack.Screen name="Referral" component={ReferralScreen} />
+        <RootStack.Screen
+          name="EmailVerification"
+          component={EmailVerificationScreen}
+          options={{ headerShown: true, title: 'Verify Email' }}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );

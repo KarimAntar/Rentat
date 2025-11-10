@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -85,6 +86,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>Sign in to your account</Text>
           </View>
@@ -172,13 +178,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               fullWidth
               style={styles.loginButton}
             />
+
+            <View style={styles.signUpContainer}>
+              <Text style={styles.signUpText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={handleSignUp} disabled={loading}>
+                <Text style={styles.signUpLink}>Sign Up</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={handleSignUp} disabled={loading}>
-              <Text style={styles.signUpText}>Sign Up</Text>
-            </TouchableOpacity>
+            {/* Footer can be empty or contain other content */}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -202,6 +212,11 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 32,
     alignItems: 'center',
+  },
+  logo: {
+    width: 120,
+    height: 60,
+    marginBottom: 16,
   },
   title: {
     fontSize: 28,
@@ -270,6 +285,21 @@ const styles = StyleSheet.create({
   loginButton: {
     marginTop: 8,
   },
+  signUpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  signUpText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  signUpLink: {
+    fontSize: 14,
+    color: '#4639eb',
+    fontWeight: '600',
+  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -279,11 +309,6 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: '#6B7280',
-  },
-  signUpText: {
-    fontSize: 14,
-    color: '#4639eb',
-    fontWeight: '600',
   },
 });
 

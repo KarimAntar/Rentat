@@ -8,6 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -157,6 +158,11 @@ const RegisterScreen: React.FC = () => {
 
           {/* Title */}
           <View style={styles.titleSection}>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>
               Join Rentat to start renting items from your community
@@ -331,6 +337,12 @@ const styles = StyleSheet.create({
   titleSection: {
     paddingHorizontal: 20,
     paddingVertical: 24,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 120,
+    height: 60,
+    marginBottom: 16,
   },
   title: {
     fontSize: 32,
