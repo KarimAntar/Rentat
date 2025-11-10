@@ -30,7 +30,7 @@ const { width } = Dimensions.get('window');
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { user } = useAuthContext();
+  const { user, signOut } = useAuthContext();
   const { data: featuredItems, loading: featuredLoading, error: featuredError } = useFeaturedItems();
 
   const getGreeting = () => {
@@ -98,7 +98,7 @@ const HomeScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
 
-        {/* Greeting Section - White Background */}
+        {/* Greeting Header - Simple Header Style */}
         <View style={styles.greetingHeader}>
           <View style={styles.greetingSection}>
             <Text style={styles.greetingText}>
@@ -107,6 +107,14 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.greetingName}>
               {getDisplayName()} 👋
             </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.actionButton}>
+              <Ionicons name="notifications-outline" size={24} color="#6B7280" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => signOut()} style={styles.actionButton}>
+              <Ionicons name="log-out-outline" size={24} color="#6B7280" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -166,7 +174,7 @@ const HomeScreen: React.FC = () => {
 
             <TouchableOpacity
               style={[styles.actionCard, { backgroundColor: '#FEF2F2' }]}
-              onPress={() => navigation.navigate('Profile' as never)}
+              onPress={() => navigation.navigate('Search' as never)}
             >
               <View style={[styles.actionIcon, { backgroundColor: '#FFFFFF' }]}>
                 <Ionicons name="heart" size={28} color="#EF4444" />
@@ -178,20 +186,16 @@ const HomeScreen: React.FC = () => {
         </View>
 
         {/* Categories Section */}
-        <View style={styles.categoriesSection}>
+        <View style={styles.categoriesCard}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Browse by Category</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Search' as never)}>
               <Text style={styles.seeAllText}>View All</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesContainer}
-          >
+          <View style={styles.categoriesContainer}>
             {categories.map(renderCategoryCard)}
-          </ScrollView>
+          </View>
         </View>
 
         {/* Featured Items */}
@@ -279,19 +283,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Greeting Header - White Background
+  // Greeting Header - Simple Header Style
   greetingHeader: {
-    paddingVertical: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: '#FFFFFF',
-    marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginBottom: 20,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  actionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // Logo and Welcome Header - Purple Background
@@ -479,6 +491,18 @@ const styles = StyleSheet.create({
   categoriesSection: {
     paddingVertical: 24,
   },
+  categoriesCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    padding: 20,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -497,11 +521,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoriesContainer: {
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 20,
   },
   categoryCard: {
     alignItems: 'center',
-    marginRight: 20,
     width: 75,
   },
   categoryIcon: {
