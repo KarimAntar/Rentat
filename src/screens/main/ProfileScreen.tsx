@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../types';
 import { useAuthContext } from '../../contexts/AuthContext';
 
@@ -100,6 +101,13 @@ const ProfileScreen: React.FC = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
+      // Navigation will be handled by the auth state change
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Auth' }],
+        })
+      );
     } catch (error) {
       console.error('Error signing out:', error);
     }
