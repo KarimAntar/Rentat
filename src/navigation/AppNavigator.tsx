@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Dimensions, StyleSheet, TouchableOpacity } from 'react-native';
-import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions, CommonActions } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -167,7 +167,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
 };
 
 // Global Header Component
-const GlobalHeader: React.FC<{ title?: string }> = ({ title }) => {
+const GlobalHeader: React.FC<{ title?: string; navigation?: any }> = ({ title, navigation }) => {
   const { user, signOut } = useAuthContext();
 
   const getGreeting = () => {
@@ -185,7 +185,15 @@ const GlobalHeader: React.FC<{ title?: string }> = ({ title }) => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      // Navigation will be handled by the auth state change
+      // Force navigation to Auth stack after sign out
+      if (navigation) {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Auth' }],
+          })
+        );
+      }
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -219,7 +227,7 @@ const MainNavigator: React.FC = () => {
     <MainTab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        header: (props) => <GlobalHeader title={props.options.title} />,
+        header: (props) => <GlobalHeader title={props.options.title} navigation={props.navigation} />,
       }}
     >
       <MainTab.Screen
