@@ -13,6 +13,11 @@ export declare const collections: {
     readonly verifications: "verifications";
 };
 export declare const config: {
+    paymob: {
+        apiKey: any;
+        integrationId: any;
+        hmacSecret: any;
+    };
     stripe: {
         secretKey: any;
         webhookSecret: any;

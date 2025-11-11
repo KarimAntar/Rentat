@@ -76,13 +76,19 @@ exports.collections = {
 };
 // Environment variables for functions
 exports.config = {
+    paymob: {
+        apiKey: process.env.PAYMOB_API_KEY || '',
+        integrationId: process.env.PAYMOB_INTEGRATION_ID || '',
+        hmacSecret: process.env.PAYMOB_HMAC_SECRET || '',
+    },
+    // Deprecated Stripe config - kept for reference during migration
     stripe: {
         secretKey: process.env.STRIPE_SECRET_KEY || '',
         webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
     },
     didit: {
         apiKey: 'arUslI6-aKMrMXKtExrHRbJiz-M4c4UcG8qK_EiIV9w',
-        workflowId: 'default-kyc-workflow',
+        workflowId: '09461199-947d-4606-99c1-fffa7fd91efc',
     },
 };
 //# sourceMappingURL=config.js.map

@@ -42,6 +42,12 @@ export const collections = {
 
 // Environment variables for functions
 export const config = {
+  paymob: {
+    apiKey: (process.env as any).PAYMOB_API_KEY || '',
+    integrationId: (process.env as any).PAYMOB_INTEGRATION_ID || '',
+    hmacSecret: (process.env as any).PAYMOB_HMAC_SECRET || '',
+  },
+  // Deprecated Stripe config - kept for reference during migration
   stripe: {
     secretKey: (process.env as any).STRIPE_SECRET_KEY || '',
     webhookSecret: (process.env as any).STRIPE_WEBHOOK_SECRET || '',
