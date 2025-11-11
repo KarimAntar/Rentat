@@ -136,8 +136,8 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  // Get display name or fallback
-  const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
+  // Get display name (first name only) or fallback
+  const displayName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
   const email = user?.email || 'No email';
 
   return (

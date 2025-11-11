@@ -193,7 +193,7 @@ const SearchScreen: React.FC = () => {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EGP',
     }).format(price);
   };
 
@@ -585,7 +585,7 @@ const SearchScreen: React.FC = () => {
         <View style={styles.quickFilters}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <TouchableOpacity style={styles.quickFilter}>
-              <Text style={styles.quickFilterText}>Under $20</Text>
+              <Text style={styles.quickFilterText}>Under EGP 20</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickFilter}>
               <Text style={styles.quickFilterText}>Nearby</Text>

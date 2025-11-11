@@ -64,20 +64,13 @@ const WalletScreen: React.FC = () => {
             <ActivityIndicator size="large" color="#FFFFFF" style={styles.balanceLoader} />
           ) : (
             <Text style={styles.balanceAmount}>
-              ${balance.toFixed(2)}
+              EGP {balance.toFixed(2)}
             </Text>
           )}
           {balanceError && (
             <Text style={styles.errorText}>{balanceError}</Text>
           )}
           <View style={styles.balanceActions}>
-            <Button
-              title="Add Funds"
-              onPress={() => console.log('Add funds pressed')}
-              variant="outline"
-              style={styles.addFundsButton}
-              size="small"
-            />
             <Button
               title="Withdraw"
               onPress={() => console.log('Withdraw pressed')}
@@ -92,11 +85,11 @@ const WalletScreen: React.FC = () => {
           <Text style={styles.cardTitle}>Earnings Summary</Text>
           <View style={styles.earningsGrid}>
             <View style={styles.earningsItem}>
-              <Text style={styles.earningsAmount}>$0.00</Text>
+              <Text style={styles.earningsAmount}>EGP 0.00</Text>
               <Text style={styles.earningsLabel}>This Month</Text>
             </View>
             <View style={styles.earningsItem}>
-              <Text style={styles.earningsAmount}>$0.00</Text>
+              <Text style={styles.earningsAmount}>EGP 0.00</Text>
               <Text style={styles.earningsLabel}>Total Earned</Text>
             </View>
           </View>
@@ -309,17 +302,17 @@ const styles = StyleSheet.create({
   },
   balanceActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
     width: '100%',
     marginTop: 8,
+    gap: 16,
   },
   addFundsButton: {
-    flex: 1,
-    marginRight: 8,
+    minWidth: 120,
   },
   withdrawButton: {
-    flex: 1,
-    marginLeft: 8,
+    minWidth: 120,
   },
   earningsCard: {
     backgroundColor: '#FFFFFF',

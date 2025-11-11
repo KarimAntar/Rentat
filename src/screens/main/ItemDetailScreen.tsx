@@ -164,7 +164,7 @@ const ItemDetailScreen: React.FC = () => {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'EGP',
     }).format(price);
   };
 

@@ -612,7 +612,7 @@ const CreateItemScreen: React.FC = () => {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Daily Rental Rate *</Text>
         <View style={styles.priceInputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
+          <Text style={styles.currencySymbol}>EGP</Text>
           <TextInput
             style={[styles.priceInput, ...(errors.dailyRate ? [styles.inputError] : [])]}
             value={formData.dailyRate}
@@ -628,7 +628,7 @@ const CreateItemScreen: React.FC = () => {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Security Deposit *</Text>
         <View style={styles.priceInputContainer}>
-          <Text style={styles.currencySymbol}>$</Text>
+          <Text style={styles.currencySymbol}>EGP</Text>
           <TextInput
             style={[styles.priceInput, ...(errors.securityDeposit ? [styles.inputError] : [])]}
             value={formData.securityDeposit}
@@ -686,7 +686,7 @@ const CreateItemScreen: React.FC = () => {
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownLabel}>Daily Rate</Text>
               <Text style={styles.breakdownValue}>
-                ${parseFloat(formData.dailyRate).toFixed(2)}
+              EGP {parseFloat(formData.dailyRate).toFixed(2)}
               </Text>
             </View>
             
@@ -698,7 +698,7 @@ const CreateItemScreen: React.FC = () => {
                 </View>
               </View>
               <Text style={styles.breakdownFee}>
-                -{commissionInfo.rate.toFixed(1)}% (${commissionInfo.commissionAmount.toFixed(2)})
+                -{commissionInfo.rate.toFixed(1)}% (EGP {commissionInfo.commissionAmount.toFixed(2)})
               </Text>
             </View>
             
@@ -707,7 +707,7 @@ const CreateItemScreen: React.FC = () => {
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownLabelBold}>You Earn (per day)</Text>
               <Text style={styles.breakdownEarnings}>
-                ${commissionInfo.estimatedEarnings.toFixed(2)}
+                EGP {commissionInfo.estimatedEarnings.toFixed(2)}
               </Text>
             </View>
           </View>
@@ -799,7 +799,7 @@ const CreateItemScreen: React.FC = () => {
             Condition: {CONDITIONS.find(c => c.value === formData.condition)?.label}
           </Text>
           <Text style={styles.reviewPrice}>
-            ${formData.dailyRate}/day • ${formData.securityDeposit} deposit
+            EGP {formData.dailyRate}/day • EGP {formData.securityDeposit} deposit
           </Text>
           <Text style={styles.reviewDescription} numberOfLines={3}>
             {formData.description}

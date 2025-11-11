@@ -64,7 +64,7 @@ const HomeScreen: React.FC = () => {
         <View style={styles.featuredContent}>
           <Text style={styles.featuredTitle} numberOfLines={2}>{item.title}</Text>
           <View style={styles.featuredMeta}>
-            <Text style={styles.featuredPrice}>${item.pricing.dailyRate}/day</Text>
+            <Text style={styles.featuredPrice}>EGP {item.pricing.dailyRate}/day</Text>
             <View style={styles.featuredRating}>
               <Ionicons name="star" size={12} color="#FFD700" />
               <Text style={styles.ratingText}>{item.ratings.average.toFixed(1)}</Text>
