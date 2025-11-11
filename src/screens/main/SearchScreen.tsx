@@ -549,21 +549,6 @@ const SearchScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={styles.discoverySection}>
-            <Text style={styles.discoveryTitle}>Trending Searches</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {trendingSearches.slice(0, 8).map((search, index) => (
-                <TouchableOpacity
-                  key={`trending-${index}`}
-                  style={styles.discoveryChip}
-                  onPress={() => setSearchQuery(search)}
-                >
-                  <Ionicons name="trending-up-outline" size={16} color="#4639eb" />
-                  <Text style={styles.discoveryChipText}>{search}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
         </View>
       )}
 
