@@ -67,10 +67,13 @@ export class DiditKycService {
         return;
       }
 
-      console.log(`Updating KYC status for user ${userId}: ${status}`);
+      // Normalize status to lowercase (Didit sends capitalized statuses)
+      const normalizedStatus = status.toLowerCase().replace(/ /g, '_');
+      
+      console.log(`Updating KYC status for user ${userId}: ${normalizedStatus}`);
 
       // Update user's KYC status
-      await this.updateUserKycStatus(userId, status, kycData);
+      await this.updateUserKycStatus(userId, normalizedStatus, kycData);
 
       console.log(`Successfully updated KYC status for user ${userId}`);
 

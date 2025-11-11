@@ -92,12 +92,20 @@ app.post('/didit-webhook', express.raw({ type: 'application/json' }), async (req
 
     console.log('Received Didit webhook:', payload);
 
-    // Basic validation
-    if (!payload.event_type || !payload.session_id) {
+    // Basic validation - Didit uses webhook_type, not event_type
+    const eventType = payload.event_type || payload.webhook_type;
+    if (!eventType || !payload.session_id) {
+      console.error('Invalid webhook payload - missing fields:', { eventType, session_id: payload.session_id });
       return res.status(400).send('Invalid webhook payload');
     }
 
-    await diditKycService.handleWebhook(payload);
+    // Normalize payload to use event_type consistently
+    const normalizedPayload = {
+      ...payload,
+      event_type: eventType,
+    };
+
+    await diditKycService.handleWebhook(normalizedPayload);
     return res.json({ success: true });
   } catch (error) {
     console.error('Error handling Didit webhook:', error);
