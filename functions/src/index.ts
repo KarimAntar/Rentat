@@ -141,9 +141,9 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
         },
         language: 'en',
         // Add redirect URLs for better UX
-        success_url: `https://rentat-app.web.app/kyc-success?userId=${userId}`,
-        failure_url: `https://rentat-app.web.app/kyc-failure?userId=${userId}`,
-        cancel_url: `https://rentat-app.web.app/kyc-cancelled?userId=${userId}`,
+        success_url: `https://rentat.vercel.app/kyc-success?userId=${userId}`,
+        failure_url: `https://rentat.vercel.app/kyc-failure?userId=${userId}`,
+        cancel_url: `https://rentat.vercel.app/kyc-cancelled?userId=${userId}`,
       }),
     });
 
