@@ -34,6 +34,7 @@ const KYCVerificationScreen: React.FC = () => {
 
   // Modal states
   const [showStartingModal, setShowStartingModal] = useState(false);
+  const [showSessionCreatedModal, setShowSessionCreatedModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCanceledModal, setShowCanceledModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -77,32 +78,40 @@ const KYCVerificationScreen: React.FC = () => {
 
       console.log('Session created:', session);
 
-      // Construct verification URL manually since Didit API doesn't provide it
-      const verificationUrl = `https://verification.didit.me/verify/${session.sessionId}`;
+      // Use the verification URL returned by Didit API
+      if (session.verificationUrl) {
+        setModalMessage('Opening verification page...');
 
-      setModalMessage('Opening verification page...');
+        try {
+          const supported = await Linking.canOpenURL(session.verificationUrl);
+          if (supported) {
+            await Linking.openURL(session.verificationUrl);
+            setShowStartingModal(false);
 
-      // Open the verification URL
-      const supported = await Linking.canOpenURL(verificationUrl);
+            // Show instructions modal
+            setModalMessage('Please complete the verification process in the opened window. Once done, return to this app.');
+            setShowSessionCreatedModal(true);
 
-      if (supported) {
-        await Linking.openURL(verificationUrl);
-        setShowStartingModal(false);
-
-        // Show instructions modal
-        setModalMessage('Please complete the verification process in the opened window. Once done, return to this app.');
-        setShowStartingModal(true);
-
-        // Auto-hide after 3 seconds and refresh status
-        setTimeout(() => {
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+              setShowSessionCreatedModal(false);
+            }, 3000);
+          } else {
+            throw new Error('URL not supported');
+          }
+        } catch (error) {
+          console.log('Direct URL failed, falling back to email/SMS approach');
           setShowStartingModal(false);
-          loadKycInfo();
-        }, 3000);
 
+          // Fallback to email/SMS instructions
+          setModalMessage('Verification session created successfully! Please check your email or SMS for verification instructions from Didit.');
+          setShowSessionCreatedModal(true);
+        }
       } else {
+        // No verification URL provided by API
         setShowStartingModal(false);
-        setModalMessage('Unable to open verification link. Please check your browser settings.');
-        setShowErrorModal(true);
+        setModalMessage('Verification session created successfully! Please check your email or SMS for verification instructions from Didit.');
+        setShowSessionCreatedModal(true);
       }
     } catch (error) {
       console.error('Error starting verification:', error);
@@ -318,6 +327,26 @@ const KYCVerificationScreen: React.FC = () => {
             <ActivityIndicator size="large" color="#4639eb" />
             <Text style={styles.modalTitle}>Starting Verification</Text>
             <Text style={styles.modalMessage}>{modalMessage}</Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Session Created Modal */}
+      <Modal
+        visible={showSessionCreatedModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="mail-outline" size={64} color="#3B82F6" />
+            <Text style={styles.modalTitle}>Check Your Email/SMS</Text>
+            <Text style={styles.modalMessage}>{modalMessage}</Text>
+            <Button
+              title="OK"
+              onPress={() => setShowSessionCreatedModal(false)}
+              style={styles.modalButton}
+            />
           </View>
         </View>
       </Modal>

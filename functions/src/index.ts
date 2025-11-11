@@ -125,12 +125,14 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
       },
       body: JSON.stringify({
         workflow_id: workflowId || config.didit.workflowId,
-        external_id: userId,
+        vendor_data: userId,
+        callback: `${config.didit.callbackUrl}?userId=${userId}`,
         metadata: {
           platform: 'rentat',
           user_id: userId,
           created_at: new Date().toISOString(),
         },
+        language: 'en',
       }),
     });
 
@@ -149,7 +151,7 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
     }
 
     const data = await response.json();
-    console.log('Didit session created:', data.session_id);
+    console.log('Didit session created:', data);
 
     // Store session info in user document (handle undefined values)
     const userRef = db.collection('users').doc(userId);
@@ -163,8 +165,8 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
     };
 
     // Only add fields that are not undefined
-    if (data.verification_url) {
-      updateData['diditKyc.verificationUrl'] = data.verification_url;
+    if (data.session_url) {
+      updateData['diditKyc.verificationUrl'] = data.session_url;
     }
     if (data.qr_code) {
       updateData['diditKyc.qrCode'] = data.qr_code;
@@ -179,7 +181,7 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
 
     return res.json({
       sessionId: data.session_id,
-      verificationUrl: data.verification_url,
+      verificationUrl: data.session_url,
       qrCode: data.qr_code,
       expiresAt: data.expires_at,
     });

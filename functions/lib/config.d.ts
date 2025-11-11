@@ -26,5 +26,6 @@ export declare const config: {
         apiKey: string;
         workflowId: string;
         webhookSecret: string;
+        callbackUrl: string;
     };
 };

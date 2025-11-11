@@ -150,12 +150,14 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
             },
             body: JSON.stringify({
                 workflow_id: workflowId || config_1.config.didit.workflowId,
-                external_id: userId,
+                vendor_data: userId,
+                callback: `${config_1.config.didit.callbackUrl}?userId=${userId}`,
                 metadata: {
                     platform: 'rentat',
                     user_id: userId,
                     created_at: new Date().toISOString(),
                 },
+                language: 'en',
             }),
         });
         if (!response.ok) {
@@ -172,7 +174,7 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
             });
         }
         const data = await response.json();
-        console.log('Didit session created:', data.session_id);
+        console.log('Didit session created:', data);
         // Store session info in user document (handle undefined values)
         const userRef = db.collection('users').doc(userId);
         const updateData = {
@@ -184,8 +186,8 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
         // Only add fields that are not undefined
-        if (data.verification_url) {
-            updateData['diditKyc.verificationUrl'] = data.verification_url;
+        if (data.session_url) {
+            updateData['diditKyc.verificationUrl'] = data.session_url;
         }
         if (data.qr_code) {
             updateData['diditKyc.qrCode'] = data.qr_code;
@@ -199,7 +201,7 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
         await userRef.update(updateData);
         return res.json({
             sessionId: data.session_id,
-            verificationUrl: data.verification_url,
+            verificationUrl: data.session_url,
             qrCode: data.qr_code,
             expiresAt: data.expires_at,
         });
