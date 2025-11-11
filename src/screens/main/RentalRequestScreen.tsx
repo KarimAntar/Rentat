@@ -5,13 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Button from '../../components/ui/Button';
+import CustomModal from '../../components/ui/CustomModal';
 import AvailabilityCalendar from '../../components/calendar/AvailabilityCalendar';
 import { RentalService, ItemService } from '../../services/firestore';
 import { useAuthContext } from '../../contexts/AuthContext';
@@ -34,24 +34,59 @@ const RentalRequestScreen: React.FC = () => {
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery' | 'meetInMiddle'>('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
 
+  // Modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    title: string;
+    message: string;
+    type: 'info' | 'success' | 'warning' | 'error';
+    buttons: Array<{
+      text: string;
+      onPress: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }>;
+  }>({
+    title: '',
+    message: '',
+    type: 'info',
+    buttons: [],
+  });
+
   useEffect(() => {
     loadItem();
   }, [itemId]);
+
+  // Helper function to show modal
+  const showModal = (
+    title: string,
+    message: string,
+    type: 'info' | 'success' | 'warning' | 'error' = 'info',
+    buttons: Array<{
+      text: string;
+      onPress: () => void;
+      style?: 'default' | 'cancel' | 'destructive';
+    }> = []
+  ) => {
+    setModalConfig({ title, message, type, buttons });
+    setModalVisible(true);
+  };
 
   const loadItem = async () => {
     try {
       setLoading(true);
       const itemData = await ItemService.getItem(itemId);
       if (!itemData) {
-        Alert.alert('Error', 'Item not found');
-        navigation.goBack();
+        showModal('Error', 'Item not found', 'error', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
         return;
       }
       setItem(itemData);
     } catch (error) {
       console.error('Error loading item:', error);
-      Alert.alert('Error', 'Failed to load item details');
-      navigation.goBack();
+      showModal('Error', 'Failed to load item details', 'error', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -73,17 +108,19 @@ const RentalRequestScreen: React.FC = () => {
     const days = Math.ceil((dates.end.getTime() - dates.start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     if (days < item.availability.minRentalDays) {
-      Alert.alert(
+      showModal(
         'Invalid Selection',
-        `Minimum rental period is ${item.availability.minRentalDays} day(s). Please select a longer period.`
+        `Minimum rental period is ${item.availability.minRentalDays} day(s). Please select a longer period.`,
+        'warning'
       );
       return;
     }
 
     if (days > item.availability.maxRentalDays) {
-      Alert.alert(
+      showModal(
         'Invalid Selection',
-        `Maximum rental period is ${item.availability.maxRentalDays} day(s). Please select a shorter period.`
+        `Maximum rental period is ${item.availability.maxRentalDays} day(s). Please select a shorter period.`,
+        'warning'
       );
       return;
     }
@@ -93,17 +130,17 @@ const RentalRequestScreen: React.FC = () => {
 
   const handleSubmitRequest = async () => {
     if (!user || !item) {
-      Alert.alert('Error', 'Please sign in to submit rental requests');
+      showModal('Error', 'Please sign in to submit rental requests', 'error');
       return;
     }
 
     if (!selectedDates.start || !selectedDates.end) {
-      Alert.alert('Missing Information', 'Please select rental dates');
+      showModal('Missing Information', 'Please select rental dates', 'warning');
       return;
     }
 
     if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
-      Alert.alert('Missing Information', 'Please provide a delivery address');
+      showModal('Missing Information', 'Please provide a delivery address', 'warning');
       return;
     }
 
@@ -126,20 +163,22 @@ const RentalRequestScreen: React.FC = () => {
           securityDeposit: securityDeposit,
           platformFee: platformFee,
           total: totalAmount,
-          currency: 'USD',
+          currency: 'EGP',
         },
         delivery: {
           method: deliveryMethod === 'meetInMiddle' ? 'meet-in-middle' : deliveryMethod,
-          pickupLocation: deliveryMethod === 'delivery' ? {
-            latitude: item.location.latitude,
-            longitude: item.location.longitude,
-            address: item.location.address,
-          } : undefined,
-          deliveryLocation: deliveryMethod === 'delivery' ? {
-            latitude: 0, // Would be set based on delivery address in real app
-            longitude: 0,
-            address: deliveryAddress,
-          } : undefined,
+          ...(deliveryMethod === 'delivery' && {
+            pickupLocation: {
+              latitude: item.location.latitude,
+              longitude: item.location.longitude,
+              address: item.location.address,
+            },
+            deliveryLocation: {
+              latitude: 0, // Would be set based on delivery address in real app
+              longitude: 0,
+              address: deliveryAddress,
+            },
+          }),
         },
         payment: {
           paymobOrderId: '', // Would be created during payment processing
@@ -168,9 +207,10 @@ const RentalRequestScreen: React.FC = () => {
 
       const rentalId = await RentalService.createRental(rentalRequest);
 
-      Alert.alert(
+      showModal(
         'Request Submitted!',
         'Your rental request has been sent to the owner. You will be notified when they respond.',
+        'success',
         [
           {
             text: 'OK',
@@ -185,17 +225,14 @@ const RentalRequestScreen: React.FC = () => {
 
     } catch (error) {
       console.error('Error submitting rental request:', error);
-      Alert.alert('Error', 'Failed to submit rental request. Please try again.');
+      showModal('Error', 'Failed to submit rental request. Please try again.', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
+    return `EGP ${price.toLocaleString('en-US')}`;
   };
 
   const formatDate = (date: Date) => {
@@ -249,7 +286,7 @@ const RentalRequestScreen: React.FC = () => {
               style={styles.dateButton}
               onPress={() => {
                 // In a real app, this would open a date picker
-                Alert.alert('Date Picker', 'Date picker would open here');
+                showModal('Date Picker', 'Date picker would open here', 'info');
               }}
             >
               <Ionicons name="calendar-outline" size={20} color="#4639eb" />
@@ -265,7 +302,7 @@ const RentalRequestScreen: React.FC = () => {
               style={styles.dateButton}
               onPress={() => {
                 // In a real app, this would open a date picker
-                Alert.alert('Date Picker', 'Date picker would open here');
+                showModal('Date Picker', 'Date picker would open here', 'info');
               }}
             >
               <Ionicons name="calendar-outline" size={20} color="#4639eb" />
@@ -484,6 +521,16 @@ const RentalRequestScreen: React.FC = () => {
           style={styles.submitButton}
         />
       </View>
+
+      {/* Custom Modal */}
+      <CustomModal
+        visible={modalVisible}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        buttons={modalConfig.buttons}
+        onClose={() => setModalVisible(false)}
+      />
     </SafeAreaView>
   );
 };
