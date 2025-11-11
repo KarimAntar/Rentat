@@ -78,23 +78,15 @@ export class DiditKycService {
     workflowId?: string
   ): Promise<DiditSession> {
     try {
-      // Use default KYC workflow if not specified
-      const finalWorkflowId = workflowId || (process.env as any).REACT_APP_DIDIT_WORKFLOW_ID || 'default-kyc-workflow';
-      
-      const response = await fetch(`${DIDIT_API_BASE_URL}/session/`, {
+      // Call Firebase Functions endpoint instead of direct API
+      const response = await fetch('https://webhooks-tfsivlyrrq-uc.a.run.app/create-kyc-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DIDIT_API_KEY}`,
         },
         body: JSON.stringify({
-          workflow_id: finalWorkflowId,
-          external_id: userId, // Link the session to our user ID
-          metadata: {
-            platform: 'rentat',
-            user_id: userId,
-            created_at: new Date().toISOString(),
-          },
+          userId,
+          workflowId,
         }),
       });
 
@@ -104,19 +96,16 @@ export class DiditKycService {
       }
 
       const data = await response.json();
-      
-      const session: DiditSession = {
-        sessionId: data.session_id,
-        verificationUrl: data.verification_url,
-        qrCode: data.qr_code,
-        status: 'not_started',
-        workflowId: finalWorkflowId,
-        createdAt: new Date(),
-        expiresAt: new Date(data.expires_at || Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      };
 
-      // Store session info in user document
-      await this.updateUserKycSession(userId, session);
+      const session: DiditSession = {
+        sessionId: data.sessionId,
+        verificationUrl: data.verificationUrl,
+        qrCode: data.qrCode,
+        status: 'not_started',
+        workflowId: workflowId || (process.env as any).REACT_APP_DIDIT_WORKFLOW_ID || 'default-kyc-workflow',
+        createdAt: new Date(),
+        expiresAt: new Date(data.expiresAt || Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      };
 
       return session;
     } catch (error) {

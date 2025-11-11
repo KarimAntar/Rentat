@@ -12,17 +12,17 @@ export declare const processRentalRequest: import("firebase-functions/v2/https")
         total: any;
         currency: any;
     };
-}>>;
+}>, unknown>;
 export declare const processRentalResponse: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     success: boolean;
     paymentClientSecret: any;
-}>>;
+}>, unknown>;
 export declare const completeRental: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     success: boolean;
-}>>;
-export declare const onRentalCreated: import("firebase-functions/v2").CloudFunction<import("firebase-functions/v2/firestore").FirestoreEvent<import("firebase-functions/v2/firestore").QueryDocumentSnapshot | undefined, {
+}>, unknown>;
+export declare const onRentalCreated: import("firebase-functions/core").CloudFunction<import("firebase-functions/v2/firestore").FirestoreEvent<import("firebase-functions/v2/firestore").QueryDocumentSnapshot | undefined, {
     rentalId: string;
 }>>;
-export declare const onRentalUpdated: import("firebase-functions/v2").CloudFunction<import("firebase-functions/v2/firestore").FirestoreEvent<import("firebase-functions/v2").Change<import("firebase-functions/v2/firestore").QueryDocumentSnapshot> | undefined, {
+export declare const onRentalUpdated: import("firebase-functions/core").CloudFunction<import("firebase-functions/v2/firestore").FirestoreEvent<import("firebase-functions/v2").Change<import("firebase-functions/v2/firestore").QueryDocumentSnapshot> | undefined, {
     rentalId: string;
 }>>;

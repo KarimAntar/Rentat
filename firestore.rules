@@ -60,32 +60,32 @@ service cloud.firestore {
     // Rentals collection
     match /rentals/{rentalId} {
       allow read: if isAuthenticated() && (
-        isOwner(resource.data.ownerId) || 
+        isOwner(resource.data.ownerId) ||
         isOwner(resource.data.renterId) ||
         isAdmin()
       );
-      
-      allow create: if isAuthenticated() && 
+
+      allow create: if isAuthenticated() &&
         isVerified() &&
         request.resource.data.renterId == request.auth.uid;
-      
+
       allow update: if isAuthenticated() && (
         // Owner can approve/reject requests and update status
-        (isOwner(resource.data.ownerId) && 
+        (isOwner(resource.data.ownerId) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'dates.confirmedStart', 'dates.confirmedEnd', 'completion.ownerConfirmed', 'updatedAt', 'timeline'])) ||
-        
+
         // Renter can confirm completion
-        (isOwner(resource.data.renterId) && 
+        (isOwner(resource.data.renterId) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completion.renterConfirmed', 'updatedAt', 'timeline'])) ||
-        
+
         // Both can update actual start/end times and damage reports
         ((isOwner(resource.data.ownerId) || isOwner(resource.data.renterId)) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dates.actualStart', 'dates.actualEnd', 'completion.damageReported', 'updatedAt', 'timeline'])) ||
-        
-        // System/Admin updates (payment processing, etc.)
+
+        // System/Admin updates (payment processing, escrow, Paymob webhooks, etc.)
         isAdmin()
       );
-      
+
       allow delete: if isAdmin();
     }
     
@@ -212,7 +212,10 @@ service cloud.firestore {
 
     // Referral codes collection
     match /referral_codes/{codeId} {
-      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      // Allow reading own codes and code validation queries
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) ||
+        // Allow reading for code uniqueness and validation checks
+        true);
       allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
       allow update: if isAuthenticated() && isOwner(resource.data.userId);
       allow delete: if isAuthenticated() && isOwner(resource.data.userId);
@@ -338,6 +341,14 @@ service cloud.firestore {
       allow update: if request.auth.token.admin == true; // Only system can update revenue records
 
       allow delete: if request.auth.token.admin == true;
+    }
+
+    // Platform costs collection
+    match /platform_costs/{costId} {
+      allow read: if isAdmin(); // Only admins can view platform costs
+      allow create: if isAdmin(); // Only system can create cost records
+      allow update: if isAdmin(); // Only system can update cost records
+      allow delete: if isAdmin();
     }
 
     // Admin logs collection

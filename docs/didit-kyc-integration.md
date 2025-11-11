@@ -288,13 +288,13 @@ try {
 ✅ **COMPLETED** - Firebase Cloud Function deployed successfully!
 
 The webhook endpoint has been deployed and is available at:
-**`https://us-central1-rentat-app.cloudfunctions.net/webhooks`**
+**`https://webhooks-tfsivlyrrq-uc.a.run.app`**
 
 The webhook handler is configured to receive Didit KYC status updates at the `/didit-webhook` endpoint.
 
 **To configure in Didit Console:**
 1. Go to your Didit dashboard → Verifications → Settings → API & Webhooks
-2. Add the webhook URL: `https://us-central1-rentat-app.cloudfunctions.net/webhooks/didit-webhook`
+2. Add the webhook URL: `https://webhooks-tfsivlyrrq-uc.a.run.app/didit-webhook`
 3. Save the configuration
 
 The webhook will automatically update user KYC status in Firestore when verification sessions complete.

@@ -8,6 +8,10 @@ import Stripe from 'stripe';
 import { initializeFirebaseAdmin, getFirestore, config } from './config';
 import { diditKycService } from './services/diditKyc';
 
+// Didit API Configuration
+const DIDIT_API_BASE_URL = 'https://api.didit.me/v2';
+const DIDIT_API_KEY = config.didit.apiKey;
+
 // Initialize Firebase Admin
 initializeFirebaseAdmin();
 
@@ -69,6 +73,70 @@ app.post('/didit-webhook', express.json(), async (req, res) => {
   } catch (error) {
     console.error('Error handling Didit webhook:', error);
     return res.status(500).send('Webhook handler failed');
+  }
+});
+
+// Didit KYC session creation endpoint
+app.post('/create-kyc-session', express.json(), async (req, res) => {
+  try {
+    const { userId, workflowId } = req.body;
+
+    if (!userId) {
+      return res.status(400).send('User ID is required');
+    }
+
+    console.log(`Creating KYC session for user ${userId}`);
+
+    // Create session via Didit API
+    const response = await fetch(`${DIDIT_API_BASE_URL}/session/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DIDIT_API_KEY}`,
+      },
+      body: JSON.stringify({
+        workflow_id: workflowId || config.didit.workflowId,
+        external_id: userId,
+        metadata: {
+          platform: 'rentat',
+          user_id: userId,
+          created_at: new Date().toISOString(),
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Didit API error:', error);
+      return res.status(response.status).json(error);
+    }
+
+    const data = await response.json();
+    console.log('Didit session created:', data.session_id);
+
+    // Store session info in user document
+    const userRef = db.collection('users').doc(userId);
+    await userRef.update({
+      'diditKyc.sessionId': data.session_id,
+      'diditKyc.verificationUrl': data.verification_url,
+      'diditKyc.qrCode': data.qr_code,
+      'diditKyc.status': 'not_started',
+      'diditKyc.workflowId': workflowId || config.didit.workflowId,
+      'diditKyc.createdAt': admin.firestore.FieldValue.serverTimestamp(),
+      'diditKyc.expiresAt': data.expires_at ? admin.firestore.Timestamp.fromDate(new Date(data.expires_at)) : admin.firestore.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
+      'diditKyc.lastUpdated': admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.json({
+      sessionId: data.session_id,
+      verificationUrl: data.verification_url,
+      qrCode: data.qr_code,
+      expiresAt: data.expires_at,
+    });
+  } catch (error) {
+    console.error('Error creating KYC session:', error);
+    return res.status(500).send('Failed to create KYC session');
   }
 });
 
