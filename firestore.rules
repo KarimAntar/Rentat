@@ -66,7 +66,9 @@ service cloud.firestore {
       );
 
       allow create: if isAuthenticated() &&
-        isVerified() &&
+        // Check if user is verified by reading their user document
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.verification.isVerified == true &&
         request.resource.data.renterId == request.auth.uid;
 
       allow update: if isAuthenticated() && (

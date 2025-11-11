@@ -126,7 +126,6 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
       body: JSON.stringify({
         workflow_id: workflowId || config.didit.workflowId,
         vendor_data: userId,
-        callback: `${config.didit.callbackUrl}?userId=${userId}`,
         metadata: {
           platform: 'rentat',
           user_id: userId,

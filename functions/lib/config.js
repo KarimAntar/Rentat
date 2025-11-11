@@ -90,7 +90,7 @@ exports.config = {
         apiKey: 'arUslI6-aKMrMXKtExrHRbJiz-M4c4UcG8qK_EiIV9w',
         workflowId: '09461199-947d-4606-99c1-fffa7fd91efc',
         webhookSecret: '8TZs7WgdreX9ByygbyXEfhOA25FPZsnm7f_jURLStKY',
-        callbackUrl: 'https://rentat.vercel.app/kyc-callback',
+        webhookUrl: 'https://us-central1-rentat-app.cloudfunctions.net/webhooks/didit-webhook',
     },
 };
 //# sourceMappingURL=config.js.map

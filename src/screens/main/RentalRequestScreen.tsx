@@ -12,8 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Button from '../../components/ui/Button';
 import CustomModal from '../../components/ui/CustomModal';
+import DatePickerModal from '../../components/ui/DatePickerModal';
 import AvailabilityCalendar from '../../components/calendar/AvailabilityCalendar';
-import { RentalService, ItemService } from '../../services/firestore';
+import { RentalService, ItemService, UserService } from '../../services/firestore';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { Item, Rental } from '../../types';
 
@@ -33,6 +34,7 @@ const RentalRequestScreen: React.FC = () => {
   const [message, setMessage] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery' | 'meetInMiddle'>('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [userVerified, setUserVerified] = useState<boolean | null>(null);
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -52,9 +54,14 @@ const RentalRequestScreen: React.FC = () => {
     buttons: [],
   });
 
+  // Date picker modal state
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [datePickerType, setDatePickerType] = useState<'start' | 'end'>('start');
+
   useEffect(() => {
     loadItem();
-  }, [itemId]);
+    checkUserVerification();
+  }, [itemId, user]);
 
   // Helper function to show modal
   const showModal = (
@@ -69,6 +76,18 @@ const RentalRequestScreen: React.FC = () => {
   ) => {
     setModalConfig({ title, message, type, buttons });
     setModalVisible(true);
+  };
+
+  const checkUserVerification = async () => {
+    if (!user) return;
+
+    try {
+      const userData = await UserService.getUser(user.uid);
+      setUserVerified(userData?.verification?.isVerified || false);
+    } catch (error) {
+      console.error('Error checking user verification:', error);
+      setUserVerified(false);
+    }
   };
 
   const loadItem = async () => {
@@ -128,9 +147,57 @@ const RentalRequestScreen: React.FC = () => {
     setSelectedDates({ start: dates.start, end: dates.end });
   };
 
+  const handleDateSelect = (date: Date) => {
+    if (datePickerType === 'start') {
+      // If selecting start date and end date exists, ensure start is before end
+      if (selectedDates.end && date >= selectedDates.end) {
+        showModal('Invalid Selection', 'Start date must be before end date.', 'warning');
+        return;
+      }
+      setSelectedDates(prev => ({ ...prev, start: date }));
+    } else {
+      // If selecting end date and start date exists, ensure end is after start
+      if (selectedDates.start && date <= selectedDates.start) {
+        showModal('Invalid Selection', 'End date must be after start date.', 'warning');
+        return;
+      }
+      setSelectedDates(prev => ({ ...prev, end: date }));
+    }
+  };
+
+  const openDatePicker = (type: 'start' | 'end') => {
+    setDatePickerType(type);
+    setDatePickerVisible(true);
+  };
+
   const handleSubmitRequest = async () => {
     if (!user || !item) {
       showModal('Error', 'Please sign in to submit rental requests', 'error');
+      return;
+    }
+
+    // Check if user is verified
+    if (userVerified === false) {
+      showModal(
+        'Identity Verification Required',
+        'To rent items on our platform, you need to verify your identity first. This helps ensure trust and security for all users.',
+        'warning',
+        [
+          {
+            text: 'Cancel',
+            onPress: () => {},
+            style: 'cancel',
+          },
+          {
+            text: 'Verify Identity',
+            onPress: () => {
+              // Close modal first, then navigate
+              setModalVisible(false);
+              navigation.navigate('KYCVerification' as never);
+            },
+          },
+        ]
+      );
       return;
     }
 
@@ -197,9 +264,9 @@ const RentalRequestScreen: React.FC = () => {
             timestamp: new Date(),
             actor: user.uid,
             details: {
-              message: message.trim() || undefined,
+              ...(message.trim() && { message: message.trim() }),
               deliveryMethod,
-              deliveryAddress: deliveryMethod === 'delivery' ? deliveryAddress : undefined,
+              ...(deliveryMethod === 'delivery' && { deliveryAddress }),
             },
           },
         ],
@@ -284,10 +351,7 @@ const RentalRequestScreen: React.FC = () => {
           <View style={styles.dateSelection}>
             <TouchableOpacity
               style={styles.dateButton}
-              onPress={() => {
-                // In a real app, this would open a date picker
-                showModal('Date Picker', 'Date picker would open here', 'info');
-              }}
+              onPress={() => openDatePicker('start')}
             >
               <Ionicons name="calendar-outline" size={20} color="#4639eb" />
               <View style={styles.dateButtonContent}>
@@ -300,10 +364,7 @@ const RentalRequestScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.dateButton}
-              onPress={() => {
-                // In a real app, this would open a date picker
-                showModal('Date Picker', 'Date picker would open here', 'info');
-              }}
+              onPress={() => openDatePicker('end')}
             >
               <Ionicons name="calendar-outline" size={20} color="#4639eb" />
               <View style={styles.dateButtonContent}>
@@ -530,6 +591,16 @@ const RentalRequestScreen: React.FC = () => {
         type={modalConfig.type}
         buttons={modalConfig.buttons}
         onClose={() => setModalVisible(false)}
+      />
+
+      {/* Date Picker Modal */}
+      <DatePickerModal
+        visible={datePickerVisible}
+        selectedDate={datePickerType === 'start' ? selectedDates.start || undefined : selectedDates.end || undefined}
+        minDate={datePickerType === 'end' && selectedDates.start ? selectedDates.start : undefined}
+        onDateSelect={handleDateSelect}
+        onClose={() => setDatePickerVisible(false)}
+        title={datePickerType === 'start' ? 'Select Start Date' : 'Select End Date'}
       />
     </SafeAreaView>
   );

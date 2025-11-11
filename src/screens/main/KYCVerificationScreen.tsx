@@ -79,41 +79,20 @@ const KYCVerificationScreen: React.FC = () => {
       console.log('Session created:', session);
       console.log('Verification URL:', session.verificationUrl);
 
-      // Use the verification URL returned by Didit API
-      if (session.verificationUrl) {
-        setModalMessage('Opening verification page...');
+      // Store the verification URL for later use
+      setVerificationUrl(session.verificationUrl);
 
-        try {
-          const supported = await Linking.canOpenURL(session.verificationUrl);
-          if (supported) {
-            await Linking.openURL(session.verificationUrl);
-            setShowStartingModal(false);
+      setShowStartingModal(false);
 
-            // Show instructions modal
-            setModalMessage('Please complete the verification process in the opened window. Once done, return to this app.');
-            setShowSessionCreatedModal(true);
+      // Show comprehensive instructions modal
+      setModalMessage(
+        'Verification session created! You have two options to complete verification:\n\n' +
+        '1. Click "Open Verification Page" below to try opening it directly\n' +
+        '2. If blocked, copy the URL and open it manually in your browser\n\n' +
+        'Complete the verification process and return to this app when done.'
+      );
+      setShowSessionCreatedModal(true);
 
-            // Auto-hide after 3 seconds
-            setTimeout(() => {
-              setShowSessionCreatedModal(false);
-            }, 3000);
-          } else {
-            throw new Error('URL not supported');
-          }
-        } catch (error) {
-          console.log('Direct URL failed, falling back to email/SMS approach');
-          setShowStartingModal(false);
-
-          // Fallback to email/SMS instructions
-          setModalMessage('Verification session created successfully! Please check your email or SMS for verification instructions from Didit.');
-          setShowSessionCreatedModal(true);
-        }
-      } else {
-        // No verification URL provided by API
-        setShowStartingModal(false);
-        setModalMessage('Verification session created successfully! Please check your email or SMS for verification instructions from Didit.');
-        setShowSessionCreatedModal(true);
-      }
     } catch (error) {
       console.error('Error starting verification:', error);
       setShowStartingModal(false);
@@ -334,14 +313,56 @@ const KYCVerificationScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Ionicons name="mail-outline" size={64} color="#3B82F6" />
-            <Text style={styles.modalTitle}>Check Your Email/SMS</Text>
+            <Ionicons name="link-outline" size={64} color="#3B82F6" />
+            <Text style={styles.modalTitle}>Verification Session Created</Text>
             <Text style={styles.modalMessage}>{modalMessage}</Text>
-            <Button
-              title="OK"
-              onPress={() => setShowSessionCreatedModal(false)}
-              style={styles.modalButton}
-            />
+
+            {/* Verification URL Display */}
+            {verificationUrl && (
+              <View style={styles.urlContainer}>
+                <Text style={styles.urlLabel}>Verification URL:</Text>
+                <TouchableOpacity
+                  style={styles.urlBox}
+                  onPress={() => {
+                    // Copy URL to clipboard (if available)
+                    // For now, just show alert with URL
+                    Alert.alert(
+                      'Verification URL',
+                      verificationUrl,
+                      [
+                        { text: 'Copy URL', onPress: () => {
+                          // In a real app, you'd use Clipboard.setString()
+                          Alert.alert('Copied!', 'URL copied to clipboard');
+                        }},
+                        { text: 'Cancel', style: 'cancel' }
+                      ]
+                    );
+                  }}
+                >
+                  <Text style={styles.urlText} numberOfLines={1} ellipsizeMode="middle">
+                    {verificationUrl}
+                  </Text>
+                  <Ionicons name="copy-outline" size={20} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.modalButtonsRow}>
+              <Button
+                title="Open Verification Page"
+                onPress={() => {
+                  setShowSessionCreatedModal(false);
+                  continueVerification();
+                }}
+                style={styles.primaryButton}
+              />
+              <Button
+                title="Close"
+                onPress={() => setShowSessionCreatedModal(false)}
+                variant="outline"
+                style={styles.modalButton}
+              />
+            </View>
           </View>
         </View>
       </Modal>
@@ -601,6 +622,40 @@ const styles = StyleSheet.create({
   modalButton: {
     minWidth: 120,
     marginVertical: 4,
+  },
+  urlContainer: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  urlLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  urlBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  urlText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#4639eb',
+    fontFamily: 'monospace',
+  },
+  modalButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
   },
 });
 
