@@ -262,6 +262,20 @@ const ProfileScreen: React.FC = () => {
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              const parentNavigation = navigation.getParent();
+              if (parentNavigation) {
+                parentNavigation.navigate('KYCVerification');
+              }
+            }}
+          >
+            <Ionicons name="shield-checkmark-outline" size={24} color="#6B7280" />
+            <Text style={styles.menuText}>Identity Verification</Text>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.menuItem}>
             <Ionicons name="list-outline" size={24} color="#6B7280" />
             <Text style={styles.menuText}>My Listings</Text>

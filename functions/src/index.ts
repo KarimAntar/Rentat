@@ -1,4 +1,3 @@
-import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { onCall, onRequest, HttpsError } from 'firebase-functions/v2/https';
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
@@ -6,9 +5,11 @@ import { setGlobalOptions } from 'firebase-functions/v2';
 import express from 'express';
 import cors from 'cors';
 import Stripe from 'stripe';
+import { initializeFirebaseAdmin, getFirestore, config } from './config';
+import { diditKycService } from './services/diditKyc';
 
 // Initialize Firebase Admin
-admin.initializeApp();
+initializeFirebaseAdmin();
 
 // Set global options
 setGlobalOptions({
@@ -17,8 +18,8 @@ setGlobalOptions({
 });
 
 // Initialize services
-const db = admin.firestore();
-const stripe = new Stripe(functions.config().stripe.secret_key, {
+const db = getFirestore();
+const stripe = new Stripe(config.stripe.secretKey, {
   apiVersion: '2023-10-16',
 });
 
@@ -29,7 +30,7 @@ app.use(cors({ origin: true }));
 // Stripe webhook endpoint
 app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'] as string;
-  const endpointSecret = functions.config().stripe.webhook_secret;
+  const endpointSecret = config.stripe.webhookSecret;
 
   let event: Stripe.Event;
 
@@ -42,10 +43,32 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
 
   try {
     await handleStripeWebhook(event);
-    res.json({ received: true });
+    return res.json({ received: true });
   } catch (error) {
     console.error('Error handling webhook:', error);
-    res.status(500).send('Webhook handler failed');
+    return res.status(500).send('Webhook handler failed');
+  }
+});
+
+// Didit KYC webhook endpoint
+app.post('/didit-webhook', express.json(), async (req, res) => {
+  try {
+    const payload = req.body;
+    console.log('Received Didit webhook:', payload);
+
+    // Basic validation
+    if (!payload.event_type || !payload.session_id) {
+      return res.status(400).send('Invalid webhook payload');
+    }
+
+    // TODO: Add webhook signature verification when Didit provides it
+    // For now, we'll trust the payload but in production you should verify signatures
+
+    await diditKycService.handleWebhook(payload);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error handling Didit webhook:', error);
+    return res.status(500).send('Webhook handler failed');
   }
 });
 

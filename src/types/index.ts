@@ -8,6 +8,7 @@ export interface User {
   dateOfBirth?: Date;
   location: Location;
   verification: UserVerification;
+  diditKyc?: DiditKycInfo;
   ratings: UserRatings;
   wallet: UserWallet;
   preferences: UserPreferences;
@@ -33,6 +34,34 @@ export interface UserVerification {
   selfiePhoto?: string;
   verifiedAt?: Date;
   verificationStatus: 'pending' | 'approved' | 'rejected';
+}
+
+export interface DiditKycInfo {
+  sessionId?: string;
+  verificationUrl?: string;
+  qrCode?: string;
+  status: 'not_started' | 'in_progress' | 'in_review' | 'approved' | 'rejected' | 'expired';
+  workflowId?: string;
+  data?: {
+    firstName?: string;
+    lastName?: string;
+    dateOfBirth?: string;
+    nationality?: string;
+    documentNumber?: string;
+    documentType?: string;
+    documentExpiry?: string;
+    address?: {
+      street?: string;
+      city?: string;
+      state?: string;
+      postalCode?: string;
+      country?: string;
+    };
+  };
+  createdAt?: Date;
+  expiresAt?: Date;
+  verifiedAt?: Date;
+  lastUpdated?: Date;
 }
 
 export interface UserRatings {
@@ -615,6 +644,7 @@ export type RootStackParamList = {
   Profile: { userId?: string };
   Settings: undefined;
   Verification: undefined;
+  KYCVerification: undefined;
   EmailVerification: undefined;
   NotificationPreferences: undefined;
   Wallet: undefined;

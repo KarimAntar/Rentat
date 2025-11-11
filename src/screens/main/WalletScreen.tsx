@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ import Button from '../../components/ui/Button';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useUserBalance, useUserTransactions } from '../../hooks/useFirestore';
 import { commissionService } from '../../services/commission';
+import { diditKycService } from '../../services/diditKyc';
 
 interface CommissionTransaction {
   id: string;
@@ -33,10 +35,91 @@ const WalletScreen: React.FC = () => {
   const [commissionLoading, setCommissionLoading] = useState(true);
   const [totalCommissionPaid, setTotalCommissionPaid] = useState(0);
   const [activeTab, setActiveTab] = useState<'all' | 'commissions'>('all');
+  const [kycVerified, setKycVerified] = useState(false);
+  const [kycLoading, setKycLoading] = useState(true);
 
   useEffect(() => {
     loadCommissionHistory();
+    checkKycStatus();
   }, [user]);
+
+  const checkKycStatus = async () => {
+    if (!user) return;
+    
+    try {
+      setKycLoading(true);
+      const isVerified = await diditKycService.isUserKycVerified(user.uid);
+      setKycVerified(isVerified);
+    } catch (error) {
+      console.error('Error checking KYC status:', error);
+    } finally {
+      setKycLoading(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!user) return;
+
+    try {
+      // Check if user is KYC verified
+      await diditKycService.requireKycVerification(user.uid);
+      
+      // Proceed with withdrawal
+      console.log('Proceed with withdrawal');
+      // TODO: Implement actual withdrawal flow
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      
+      if (errorMessage === 'KYC_REQUIRED') {
+        Alert.alert(
+          'Verification Required',
+          'You need to complete identity verification before you can withdraw funds. This helps keep our community safe and secure.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Verify Now',
+              onPress: () => {
+                // Navigate to verification screen
+                console.log('Navigate to KYC verification');
+              }
+            }
+          ]
+        );
+      } else if (errorMessage === 'KYC_IN_PROGRESS') {
+        Alert.alert(
+          'Verification In Progress',
+          'Your identity verification is currently in progress. Please wait for it to be completed before withdrawing funds.'
+        );
+      } else if (errorMessage === 'KYC_IN_REVIEW') {
+        Alert.alert(
+          'Verification Under Review',
+          'Your identity verification is under review. We will notify you once it has been completed.'
+        );
+      } else if (errorMessage === 'KYC_REJECTED') {
+        Alert.alert(
+          'Verification Rejected',
+          'Your identity verification was rejected. Please contact support for more information.'
+        );
+      } else if (errorMessage === 'KYC_EXPIRED') {
+        Alert.alert(
+          'Verification Expired',
+          'Your identity verification has expired. Please complete the verification process again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Verify Again',
+              onPress: () => {
+                // Navigate to verification screen
+                console.log('Navigate to KYC verification');
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to process withdrawal. Please try again.');
+      }
+    }
+  };
 
   const loadCommissionHistory = async () => {
     if (!user) return;
@@ -72,13 +155,18 @@ const WalletScreen: React.FC = () => {
           )}
           <View style={styles.balanceActions}>
             <Button
-              title="Withdraw"
-              onPress={() => console.log('Withdraw pressed')}
+              title={kycVerified ? "Withdraw" : "Verify to Withdraw"}
+              onPress={handleWithdraw}
               style={styles.withdrawButton}
               size="small"
-              disabled={balance <= 0}
+              disabled={balance <= 0 || kycLoading}
             />
           </View>
+          {!kycVerified && !kycLoading && (
+            <Text style={styles.kycWarning}>
+              Complete identity verification to unlock withdrawals
+            </Text>
+          )}
         </View>
 
         <View style={styles.earningsCard}>
@@ -299,6 +387,12 @@ const styles = StyleSheet.create({
     color: '#FCA5A5',
     textAlign: 'center',
     marginBottom: 16,
+  },
+  kycWarning: {
+    fontSize: 12,
+    color: '#F59E0B',
+    textAlign: 'center',
+    marginTop: 8,
   },
   balanceActions: {
     flexDirection: 'row',

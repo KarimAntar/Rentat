@@ -341,6 +341,11 @@ const AppNavigator: React.FC = () => {
         <RootStack.Screen name="NotificationPreferences" component={require('../screens/main/NotificationPreferencesScreen').default} />
         <RootStack.Screen name="Referral" component={ReferralScreen} />
         <RootStack.Screen
+          name="KYCVerification"
+          component={require('../screens/main/KYCVerificationScreen').default}
+          options={{ headerShown: true, title: 'Identity Verification' }}
+        />
+        <RootStack.Screen
           name="EmailVerification"
           component={EmailVerificationScreen}
           options={{ headerShown: true, title: 'Verify Email' }}
