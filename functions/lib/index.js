@@ -86,16 +86,29 @@ app.post('/stripe-webhook', express_1.default.raw({ type: 'application/json' }),
     }
 });
 // Didit KYC webhook endpoint
-app.post('/didit-webhook', express_1.default.json(), async (req, res) => {
+app.post('/didit-webhook', express_1.default.raw({ type: 'application/json' }), async (req, res) => {
     try {
-        const payload = req.body;
+        const rawBody = req.body;
+        const signature = req.headers['x-didit-signature'];
+        // Verify webhook signature for security
+        if (signature && config_1.config.didit.webhookSecret) {
+            const crypto = require('crypto');
+            const expectedSignature = crypto
+                .createHmac('sha256', config_1.config.didit.webhookSecret)
+                .update(rawBody, 'utf8')
+                .digest('hex');
+            if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+                console.error('Invalid webhook signature');
+                return res.status(401).send('Invalid signature');
+            }
+        }
+        // Parse the JSON payload
+        const payload = JSON.parse(rawBody.toString());
         console.log('Received Didit webhook:', payload);
         // Basic validation
         if (!payload.event_type || !payload.session_id) {
             return res.status(400).send('Invalid webhook payload');
         }
-        // TODO: Add webhook signature verification when Didit provides it
-        // For now, we'll trust the payload but in production you should verify signatures
         await diditKyc_1.diditKycService.handleWebhook(payload);
         return res.json({ success: true });
     }
@@ -117,7 +130,7 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${DIDIT_API_KEY}`,
+                'X-API-Key': DIDIT_API_KEY,
             },
             body: JSON.stringify({
                 workflow_id: workflowId || config_1.config.didit.workflowId,

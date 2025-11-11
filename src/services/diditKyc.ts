@@ -91,8 +91,18 @@ export class DiditKycService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create verification session');
+        let errorMessage = 'Failed to create verification session';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || error.error || error.details || errorMessage;
+          console.error('Backend error details:', error);
+        } catch (e) {
+          // If we can't parse JSON, get text response
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+          console.error('Backend error text:', errorText);
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();

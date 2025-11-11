@@ -290,14 +290,21 @@ try {
 The webhook endpoint has been deployed and is available at:
 **`https://webhooks-tfsivlyrrq-uc.a.run.app`**
 
-The webhook handler is configured to receive Didit KYC status updates at the `/didit-webhook` endpoint.
+The webhook handler is configured to receive Didit KYC status updates at the `/didit-webhook` endpoint with **signature verification** for security.
+
+**Webhook Security Features:**
+- ✅ HMAC-SHA256 signature verification using secret key
+- ✅ Raw body parsing for accurate signature validation
+- ✅ Secure header validation (`x-didit-signature`)
+- ✅ Protection against malicious webhook attempts
 
 **To configure in Didit Console:**
 1. Go to your Didit dashboard → Verifications → Settings → API & Webhooks
 2. Add the webhook URL: `https://webhooks-tfsivlyrrq-uc.a.run.app/didit-webhook`
-3. Save the configuration
+3. Add the webhook secret key: `8TZs7WgdreX9ByygbyXEfhOA25FPZsnm7f_jURLStKY`
+4. Save the configuration
 
-The webhook will automatically update user KYC status in Firestore when verification sessions complete.
+The webhook will automatically update user KYC status in Firestore when verification sessions complete, with full security validation.
 
 ### 6. Update Firestore Rules
 

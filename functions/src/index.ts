@@ -55,18 +55,33 @@ app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (re
 });
 
 // Didit KYC webhook endpoint
-app.post('/didit-webhook', express.json(), async (req, res) => {
+app.post('/didit-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
-    const payload = req.body;
+    const rawBody = req.body;
+    const signature = req.headers['x-didit-signature'] as string;
+
+    // Verify webhook signature for security
+    if (signature && config.didit.webhookSecret) {
+      const crypto = require('crypto');
+      const expectedSignature = crypto
+        .createHmac('sha256', config.didit.webhookSecret)
+        .update(rawBody, 'utf8')
+        .digest('hex');
+
+      if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
+        console.error('Invalid webhook signature');
+        return res.status(401).send('Invalid signature');
+      }
+    }
+
+    // Parse the JSON payload
+    const payload = JSON.parse(rawBody.toString());
     console.log('Received Didit webhook:', payload);
 
     // Basic validation
     if (!payload.event_type || !payload.session_id) {
       return res.status(400).send('Invalid webhook payload');
     }
-
-    // TODO: Add webhook signature verification when Didit provides it
-    // For now, we'll trust the payload but in production you should verify signatures
 
     await diditKycService.handleWebhook(payload);
     return res.json({ success: true });
@@ -92,7 +107,7 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DIDIT_API_KEY}`,
+        'X-API-Key': DIDIT_API_KEY,
       },
       body: JSON.stringify({
         workflow_id: workflowId || config.didit.workflowId,
