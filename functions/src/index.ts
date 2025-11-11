@@ -116,7 +116,7 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
 
     console.log(`Creating KYC session for user ${userId}`);
 
-    // Create session via Didit API
+    // Create session via Didit API with redirect URLs
     const response = await fetch(`${DIDIT_API_BASE_URL}/session/`, {
       method: 'POST',
       headers: {
@@ -132,6 +132,10 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
           created_at: new Date().toISOString(),
         },
         language: 'en',
+        // Add redirect URLs for better UX
+        success_url: `https://rentat-app.web.app/kyc-success?userId=${userId}`,
+        failure_url: `https://rentat-app.web.app/kyc-failure?userId=${userId}`,
+        cancel_url: `https://rentat-app.web.app/kyc-cancelled?userId=${userId}`,
       }),
     });
 

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Cancelled - Rentat</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 48px 32px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .icon {
+            width: 80px;
+            height: 80px;
+            background: #F59E0B;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        .warning {
+            width: 40px;
+            height: 40px;
+            position: relative;
+        }
+
+        .warning::before {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 24px;
+            background: white;
+            top: 2px;
+            left: 18px;
+            border-radius: 2px;
+        }
+
+        .warning::after {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: white;
+            bottom: 4px;
+            left: 18px;
+            border-radius: 50%;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 16px;
+        }
+
+        p {
+            font-size: 18px;
+            color: #6B7280;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .info-box {
+            background: #FFFBEB;
+            border: 1px solid #FDE68A;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+
+        .info-box h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #92400E;
+            margin-bottom: 12px;
+        }
+
+        .info-box p {
+            font-size: 14px;
+            color: #D97706;
+            margin-bottom: 0;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 16px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .button-primary {
+            background: #4639eb;
+            color: white;
+        }
+
+        .button-primary:hover {
+            background: #3730a3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(70, 57, 235, 0.3);
+        }
+
+        .button-secondary {
+            background: white;
+            color: #4639eb;
+            border: 2px solid #4639eb;
+        }
+
+        .button-secondary:hover {
+            background: #F3F4F6;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .auto-close {
+            font-size: 14px;
+            color: #9CA3AF;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">
+            <div class="warning"></div>
+        </div>
+        
+        <h1>Verification Cancelled</h1>
+        
+        <p>
+            You cancelled the verification process. No worries, you can restart it anytime!
+        </p>
+
+        <div class="info-box">
+            <h3>Why complete verification?</h3>
+            <p>
+                Verification is required to access important features like making rental requests, 
+                withdrawing earnings, and ensuring a safe marketplace for all users.
+            </p>
+        </div>
+
+        <div class="buttons">
+            <a href="rentat://" class="button button-primary" onclick="closeWindow()">Return to App</a>
+            <a href="rentat://verify" class="button button-secondary">Try Again</a>
+        </div>
+        
+        <p class="auto-close" id="countdown">This page will close automatically in 12 seconds...</p>
+    </div>
+
+    <script>
+        let seconds = 12;
+        const countdownElement = document.getElementById('countdown');
+
+        function updateCountdown() {
+            seconds--;
+            if (seconds > 0) {
+                countdownElement.textContent = `This page will close automatically in ${seconds} seconds...`;
+            } else {
+                closeWindow();
+            }
+        }
+
+        function closeWindow() {
+            // Try to redirect to the app
+            window.location.href = 'rentat://';
+            
+            // After a short delay, try to close the window
+            setTimeout(() => {
+                window.close();
+                
+                // If window.close() doesn't work, show a message
+                setTimeout(() => {
+                    countdownElement.textContent = 'You can now close this window and return to the app.';
+                }, 500);
+            }, 1000);
+        }
+
+        // Start countdown
+        setInterval(updateCountdown, 1000);
+    </script>
+</body>
+</html>

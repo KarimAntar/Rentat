@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Successful - Rentat</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 48px 32px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .icon {
+            width: 80px;
+            height: 80px;
+            background: #10B981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            border: 4px solid white;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .checkmark::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 24px;
+            border: solid white;
+            border-width: 0 4px 4px 0;
+            transform: rotate(45deg);
+            top: 2px;
+            left: 10px;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 16px;
+        }
+
+        p {
+            font-size: 18px;
+            color: #6B7280;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .info-box {
+            background: #F3F4F6;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+
+        .info-box h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-box li {
+            font-size: 14px;
+            color: #6B7280;
+            margin-bottom: 8px;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .info-box li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #10B981;
+            font-weight: bold;
+        }
+
+        .button {
+            display: inline-block;
+            background: #4639eb;
+            color: white;
+            padding: 16px 32px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .button:hover {
+            background: #3730a3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(70, 57, 235, 0.3);
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .auto-close {
+            font-size: 14px;
+            color: #9CA3AF;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">
+            <div class="checkmark"></div>
+        </div>
+        
+        <h1>Verification Successful! 🎉</h1>
+        
+        <p>
+            Your identity has been verified successfully. You now have access to all Rentat features!
+        </p>
+
+        <div class="info-box">
+            <h3>What's unlocked:</h3>
+            <ul>
+                <li>Make rental requests</li>
+                <li>Withdraw your earnings</li>
+                <li>Access premium features</li>
+                <li>Enhanced account security</li>
+            </ul>
+        </div>
+
+        <a href="rentat://" class="button" onclick="closeWindow()">Return to App</a>
+        
+        <p class="auto-close" id="countdown">This page will close automatically in 10 seconds...</p>
+    </div>
+
+    <script>
+        let seconds = 10;
+        const countdownElement = document.getElementById('countdown');
+
+        function updateCountdown() {
+            seconds--;
+            if (seconds > 0) {
+                countdownElement.textContent = `This page will close automatically in ${seconds} seconds...`;
+            } else {
+                closeWindow();
+            }
+        }
+
+        function closeWindow() {
+            // Try to redirect to the app
+            window.location.href = 'rentat://';
+            
+            // After a short delay, try to close the window
+            setTimeout(() => {
+                window.close();
+                
+                // If window.close() doesn't work, show a message
+                setTimeout(() => {
+                    countdownElement.textContent = 'You can now close this window and return to the app.';
+                }, 500);
+            }, 1000);
+        }
+
+        // Start countdown
+        setInterval(updateCountdown, 1000);
+    </script>
+</body>
+</html>

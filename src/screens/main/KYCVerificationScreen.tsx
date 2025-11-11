@@ -44,10 +44,20 @@ const KYCVerificationScreen: React.FC = () => {
     loadKycInfo();
   }, [user]);
 
-  // Refresh status when returning to screen
+  // Refresh status when returning to screen with polling
   useFocusEffect(
     React.useCallback(() => {
       loadKycInfo();
+      
+      // Set up polling to check for status updates every 5 seconds
+      const pollInterval = setInterval(() => {
+        loadKycInfo();
+      }, 5000);
+      
+      // Clear interval when screen loses focus
+      return () => {
+        clearInterval(pollInterval);
+      };
     }, [])
   );
 
