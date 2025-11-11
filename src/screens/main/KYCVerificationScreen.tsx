@@ -6,12 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
   Alert,
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { diditKycService } from '../../services/diditKyc';
 import Button from '../../components/ui/Button';
@@ -31,9 +32,23 @@ const KYCVerificationScreen: React.FC = () => {
   const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
   const [startingVerification, setStartingVerification] = useState(false);
 
+  // Modal states
+  const [showStartingModal, setShowStartingModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showCanceledModal, setShowCanceledModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+
   useEffect(() => {
     loadKycInfo();
   }, [user]);
+
+  // Refresh status when returning to screen
+  useFocusEffect(
+    React.useCallback(() => {
+      loadKycInfo();
+    }, [])
+  );
 
   const loadKycInfo = async () => {
     if (!user) return;
@@ -55,25 +70,45 @@ const KYCVerificationScreen: React.FC = () => {
 
     try {
       setStartingVerification(true);
+      setShowStartingModal(true);
+      setModalMessage('Creating verification session...');
+
       const session = await diditKycService.createVerificationSession(user.uid);
-      setVerificationUrl(session.verificationUrl);
-      
+
+      console.log('Session created:', session);
+
+      // Construct verification URL manually since Didit API doesn't provide it
+      const verificationUrl = `https://verification.didit.me/verify/${session.sessionId}`;
+
+      setModalMessage('Opening verification page...');
+
       // Open the verification URL
-      if (session.verificationUrl) {
-        const supported = await Linking.canOpenURL(session.verificationUrl);
-        if (supported) {
-          await Linking.openURL(session.verificationUrl);
-          // Refresh status after a delay
-          setTimeout(() => {
-            loadKycInfo();
-          }, 2000);
-        } else {
-          Alert.alert('Error', 'Unable to open verification link');
-        }
+      const supported = await Linking.canOpenURL(verificationUrl);
+
+      if (supported) {
+        await Linking.openURL(verificationUrl);
+        setShowStartingModal(false);
+
+        // Show instructions modal
+        setModalMessage('Please complete the verification process in the opened window. Once done, return to this app.');
+        setShowStartingModal(true);
+
+        // Auto-hide after 3 seconds and refresh status
+        setTimeout(() => {
+          setShowStartingModal(false);
+          loadKycInfo();
+        }, 3000);
+
+      } else {
+        setShowStartingModal(false);
+        setModalMessage('Unable to open verification link. Please check your browser settings.');
+        setShowErrorModal(true);
       }
     } catch (error) {
       console.error('Error starting verification:', error);
-      Alert.alert('Error', 'Failed to start verification. Please try again.');
+      setShowStartingModal(false);
+      setModalMessage('Failed to start verification. Please try again.');
+      setShowErrorModal(true);
     } finally {
       setStartingVerification(false);
     }
@@ -271,6 +306,106 @@ const KYCVerificationScreen: React.FC = () => {
           />
         )}
       </ScrollView>
+
+      {/* Starting Verification Modal */}
+      <Modal
+        visible={showStartingModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ActivityIndicator size="large" color="#4639eb" />
+            <Text style={styles.modalTitle}>Starting Verification</Text>
+            <Text style={styles.modalMessage}>{modalMessage}</Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="checkmark-circle" size={64} color="#10B981" />
+            <Text style={styles.modalTitle}>Verification Successful!</Text>
+            <Text style={styles.modalMessage}>
+              Your identity has been verified successfully. You now have access to all features including withdrawals.
+            </Text>
+            <Button
+              title="Continue"
+              onPress={() => {
+                setShowSuccessModal(false);
+                navigation.goBack();
+              }}
+              style={styles.modalButton}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Canceled Modal */}
+      <Modal
+        visible={showCanceledModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="close-circle" size={64} color="#F59E0B" />
+            <Text style={styles.modalTitle}>Verification Canceled</Text>
+            <Text style={styles.modalMessage}>
+              The verification process was canceled or closed. You can restart the verification at any time.
+            </Text>
+            <Button
+              title="Try Again"
+              onPress={() => {
+                setShowCanceledModal(false);
+                startVerification();
+              }}
+              style={styles.modalButton}
+            />
+            <Button
+              title="Cancel"
+              onPress={() => setShowCanceledModal(false)}
+              variant="outline"
+              style={styles.modalButton}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal
+        visible={showErrorModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="alert-circle" size={64} color="#EF4444" />
+            <Text style={styles.modalTitle}>Verification Error</Text>
+            <Text style={styles.modalMessage}>{modalMessage}</Text>
+            <Button
+              title="Try Again"
+              onPress={() => {
+                setShowErrorModal(false);
+                startVerification();
+              }}
+              style={styles.modalButton}
+            />
+            <Button
+              title="Cancel"
+              onPress={() => setShowErrorModal(false)}
+              variant="outline"
+              style={styles.modalButton}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -403,6 +538,45 @@ const styles = StyleSheet.create({
     color: '#4639eb',
     fontWeight: '600',
     marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    margin: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    maxWidth: 400,
+    width: '90%',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  modalButton: {
+    minWidth: 120,
+    marginVertical: 4,
   },
 });
 

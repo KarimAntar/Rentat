@@ -93,14 +93,20 @@ export class DiditKycService {
       if (!response.ok) {
         let errorMessage = 'Failed to create verification session';
         try {
-          const error = await response.json();
+          // Clone the response to read it multiple times if needed
+          const responseClone = response.clone();
+          const error = await responseClone.json();
           errorMessage = error.message || error.error || error.details || errorMessage;
           console.error('Backend error details:', error);
         } catch (e) {
           // If we can't parse JSON, get text response
-          const errorText = await response.text();
-          errorMessage = errorText || errorMessage;
-          console.error('Backend error text:', errorText);
+          try {
+            const errorText = await response.text();
+            errorMessage = errorText || errorMessage;
+            console.error('Backend error text:', errorText);
+          } catch (textError) {
+            console.error('Could not read error response:', textError);
+          }
         }
         throw new Error(errorMessage);
       }

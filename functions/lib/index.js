@@ -47,7 +47,7 @@ const stripe_1 = __importDefault(require("stripe"));
 const config_1 = require("./config");
 const diditKyc_1 = require("./services/diditKyc");
 // Didit API Configuration
-const DIDIT_API_BASE_URL = 'https://api.didit.me/v2';
+const DIDIT_API_BASE_URL = 'https://verification.didit.me/v2';
 const DIDIT_API_KEY = config_1.config.didit.apiKey;
 // Initialize Firebase Admin
 (0, config_1.initializeFirebaseAdmin)();
@@ -102,8 +102,24 @@ app.post('/didit-webhook', express_1.default.raw({ type: 'application/json' }), 
                 return res.status(401).send('Invalid signature');
             }
         }
-        // Parse the JSON payload
-        const payload = JSON.parse(rawBody.toString());
+        // Parse the JSON payload - handle both raw buffer and already parsed object
+        let payload;
+        try {
+            if (Buffer.isBuffer(rawBody)) {
+                payload = JSON.parse(rawBody.toString());
+            }
+            else if (typeof rawBody === 'string') {
+                payload = JSON.parse(rawBody);
+            }
+            else {
+                // Already parsed object
+                payload = rawBody;
+            }
+        }
+        catch (parseError) {
+            console.error('Failed to parse webhook payload:', parseError);
+            return res.status(400).send('Invalid JSON payload');
+        }
         console.log('Received Didit webhook:', payload);
         // Basic validation
         if (!payload.event_type || !payload.session_id) {
@@ -157,19 +173,30 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
         }
         const data = await response.json();
         console.log('Didit session created:', data.session_id);
-        // Store session info in user document
+        // Store session info in user document (handle undefined values)
         const userRef = db.collection('users').doc(userId);
-        await userRef.update({
+        const updateData = {
             'diditKyc.sessionId': data.session_id,
-            'diditKyc.verificationUrl': data.verification_url,
-            'diditKyc.qrCode': data.qr_code,
             'diditKyc.status': 'not_started',
             'diditKyc.workflowId': workflowId || config_1.config.didit.workflowId,
             'diditKyc.createdAt': admin.firestore.FieldValue.serverTimestamp(),
-            'diditKyc.expiresAt': data.expires_at ? admin.firestore.Timestamp.fromDate(new Date(data.expires_at)) : admin.firestore.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
             'diditKyc.lastUpdated': admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        };
+        // Only add fields that are not undefined
+        if (data.verification_url) {
+            updateData['diditKyc.verificationUrl'] = data.verification_url;
+        }
+        if (data.qr_code) {
+            updateData['diditKyc.qrCode'] = data.qr_code;
+        }
+        if (data.expires_at) {
+            updateData['diditKyc.expiresAt'] = admin.firestore.Timestamp.fromDate(new Date(data.expires_at));
+        }
+        else {
+            updateData['diditKyc.expiresAt'] = admin.firestore.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
+        }
+        await userRef.update(updateData);
         return res.json({
             sessionId: data.session_id,
             verificationUrl: data.verification_url,
