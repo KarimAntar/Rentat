@@ -106,9 +106,17 @@ app.post('/create-kyc-session', express.json(), async (req, res) => {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('Didit API error:', error);
-      return res.status(response.status).json(error);
+      const errorText = await response.text();
+      console.error('Didit API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      return res.status(response.status).json({
+        error: 'Didit API error',
+        status: response.status,
+        details: errorText
+      });
     }
 
     const data = await response.json();
