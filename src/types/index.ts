@@ -268,8 +268,14 @@ export interface RentalPricing {
 }
 
 export interface RentalPayment {
-  stripePaymentIntentId: string;
+  // Paymob fields (new)
+  paymobOrderId?: string;
+  paymobTransactionId?: string;
+
+  // Stripe fields (legacy - kept for backward compatibility)
+  stripePaymentIntentId?: string;
   stripeTransferId?: string;
+
   paymentStatus: PaymentStatus;
   depositStatus: DepositStatus;
   payoutStatus: PayoutStatus;

@@ -142,7 +142,8 @@ const RentalRequestScreen: React.FC = () => {
           } : undefined,
         },
         payment: {
-          stripePaymentIntentId: '', // Would be created during payment processing
+          paymobOrderId: '', // Would be created during payment processing
+          paymobTransactionId: '', // Would be set after payment completion
           paymentStatus: 'pending',
           depositStatus: 'held',
           payoutStatus: 'pending',

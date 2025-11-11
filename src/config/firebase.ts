@@ -6,18 +6,23 @@ import { getFunctions, connectFunctionsEmulator, Functions } from 'firebase/func
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-console.log("FIREBASE_API_KEY at runtime:", process.env.EXPO_PUBLIC_FIREBASE_API_KEY);
-
 // Firebase configuration
-const firebaseConfig = {
+// @ts-ignore - Expo environment variables are available at runtime
+const firebaseConfig: any = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
+
+// measurementId is optional
+// @ts-ignore - Expo environment variables are available at runtime
+const measurementId = process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID;
+if (measurementId) {
+  firebaseConfig.measurementId = measurementId;
+}
 
 // Validate required configuration
 const requiredVars = [
@@ -27,6 +32,7 @@ const requiredVars = [
   { key: "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET", value: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET },
   { key: "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", value: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID },
   { key: "EXPO_PUBLIC_FIREBASE_APP_ID", value: process.env.EXPO_PUBLIC_FIREBASE_APP_ID },
+  // measurementId is optional
 ];
 
 for (const v of requiredVars) {

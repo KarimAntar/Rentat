@@ -175,6 +175,19 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
         }
         const data = await response.json();
         console.log('Didit session created:', data);
+        // Get session details to retrieve session_url
+        const sessionDetailsResponse = await fetch(`${DIDIT_API_BASE_URL}/session/${data.session_id}/`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': DIDIT_API_KEY,
+            },
+        });
+        let sessionDetails = data; // fallback to creation response
+        if (sessionDetailsResponse.ok) {
+            sessionDetails = await sessionDetailsResponse.json();
+            console.log('Didit session details:', sessionDetails);
+        }
         // Store session info in user document (handle undefined values)
         const userRef = db.collection('users').doc(userId);
         const updateData = {
@@ -186,14 +199,14 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
         // Only add fields that are not undefined
-        if (data.session_url) {
-            updateData['diditKyc.verificationUrl'] = data.session_url;
+        if (sessionDetails.url) {
+            updateData['diditKyc.verificationUrl'] = sessionDetails.url;
         }
-        if (data.qr_code) {
-            updateData['diditKyc.qrCode'] = data.qr_code;
+        if (sessionDetails.qr_code) {
+            updateData['diditKyc.qrCode'] = sessionDetails.qr_code;
         }
-        if (data.expires_at) {
-            updateData['diditKyc.expiresAt'] = admin.firestore.Timestamp.fromDate(new Date(data.expires_at));
+        if (sessionDetails.expires_at) {
+            updateData['diditKyc.expiresAt'] = admin.firestore.Timestamp.fromDate(new Date(sessionDetails.expires_at));
         }
         else {
             updateData['diditKyc.expiresAt'] = admin.firestore.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
@@ -201,9 +214,9 @@ app.post('/create-kyc-session', express_1.default.json(), async (req, res) => {
         await userRef.update(updateData);
         return res.json({
             sessionId: data.session_id,
-            verificationUrl: data.session_url,
-            qrCode: data.qr_code,
-            expiresAt: data.expires_at,
+            verificationUrl: sessionDetails.url,
+            qrCode: sessionDetails.qr_code,
+            expiresAt: sessionDetails.expires_at,
         });
     }
     catch (error) {

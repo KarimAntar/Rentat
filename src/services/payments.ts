@@ -14,9 +14,10 @@ import { db, collections } from '../config/firebase';
 import { Rental, WalletTransaction, User } from '../types';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
+import { paymobService } from '../config/paymob';
 
-// Note: All Stripe operations are now handled server-side through Firebase Functions
-// for security and compatibility reasons.
+// Note: All payment operations are now handled server-side through Firebase Functions
+// for security and compatibility reasons. Paymob integration is now active.
 
 export interface PaymentIntentData {
   amount: number; // in cents

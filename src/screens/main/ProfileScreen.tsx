@@ -23,6 +23,7 @@ import { commissionService } from '../../services/commission';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, collections } from '../../config/firebase';
 import { UserSubscription } from '../../services/subscriptions';
+import { diditKycService } from '../../services/diditKyc';
 
 interface TierInfo {
   currentTier: string;
@@ -41,10 +42,24 @@ const ProfileScreen: React.FC = () => {
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+  const [isVerified, setIsVerified] = useState<boolean | null>(null);
 
   useEffect(() => {
     loadTierInfo();
+    checkVerificationStatus();
   }, [user]);
+
+  const checkVerificationStatus = async () => {
+    if (!user) return;
+
+    try {
+      const verified = await diditKycService.isUserKycVerified(user.uid);
+      setIsVerified(verified);
+    } catch (error) {
+      console.error('Error checking verification status:', error);
+      setIsVerified(false);
+    }
+  };
 
   const handleEditProfile = () => {
     const parentNavigation = navigation.getParent();
@@ -160,6 +175,31 @@ const ProfileScreen: React.FC = () => {
             </View>
           )}
         </View>
+
+        {/* Identity Verification Prompt - Only show if not verified */}
+        {isVerified === false && (
+          <View style={styles.verificationPrompt}>
+            <View style={styles.verificationPromptContent}>
+              <Ionicons name="shield-checkmark" size={48} color="#4639eb" />
+              <Text style={styles.verificationPromptTitle}>
+                Complete Identity Verification
+              </Text>
+              <Text style={styles.verificationPromptMessage}>
+                Verify your identity to unlock withdrawals, rental requests, and all premium features.
+              </Text>
+              <Button
+                title="Verify Identity"
+                onPress={() => {
+                  const parentNavigation = navigation.getParent();
+                  if (parentNavigation) {
+                    parentNavigation.navigate('KYCVerification');
+                  }
+                }}
+                style={styles.verificationButton}
+              />
+            </View>
+          </View>
+        )}
 
         {/* Commission Tier Card */}
         {loading ? (
@@ -556,6 +596,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#92400E',
+  },
+  verificationPrompt: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#E0E7FF',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  verificationPromptContent: {
+    alignItems: 'center',
+  },
+  verificationPromptTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#111827',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  verificationPromptMessage: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  verificationButton: {
+    minWidth: 160,
   },
 });
 

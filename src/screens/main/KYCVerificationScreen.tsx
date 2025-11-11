@@ -77,6 +77,7 @@ const KYCVerificationScreen: React.FC = () => {
       const session = await diditKycService.createVerificationSession(user.uid);
 
       console.log('Session created:', session);
+      console.log('Verification URL:', session.verificationUrl);
 
       // Use the verification URL returned by Didit API
       if (session.verificationUrl) {
@@ -255,19 +256,13 @@ const KYCVerificationScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Verification Status Info */}
-        {kycInfo?.sessionId && (
+        {/* Verification Status Info - Only show for completed verifications */}
+        {kycInfo?.status === 'approved' && kycInfo?.verifiedAt && (
           <View style={styles.infoSection}>
-            <Text style={styles.infoLabel}>Session ID:</Text>
-            <Text style={styles.infoValue}>{kycInfo.sessionId.substring(0, 16)}...</Text>
-            {kycInfo.verifiedAt && (
-              <>
-                <Text style={styles.infoLabel}>Verified On:</Text>
-                <Text style={styles.infoValue}>
-                  {new Date(kycInfo.verifiedAt.seconds * 1000).toLocaleDateString()}
-                </Text>
-              </>
-            )}
+            <Text style={styles.infoLabel}>Verified On:</Text>
+            <Text style={styles.infoValue}>
+              {new Date(kycInfo.verifiedAt.seconds * 1000).toLocaleDateString()}
+            </Text>
           </View>
         )}
 
@@ -442,7 +437,7 @@ const KYCVerificationScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8F7FF', // Light purple background to match brand
   },
   loadingContainer: {
     flex: 1,

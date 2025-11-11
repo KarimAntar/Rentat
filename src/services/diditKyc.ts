@@ -11,7 +11,7 @@ import { doc, updateDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db, collections } from '../config/firebase';
 
 // Didit API Configuration
-const DIDIT_API_BASE_URL = 'https://api.didit.me/v2';
+const DIDIT_API_BASE_URL = 'https://verification.didit.me/v2';
 const DIDIT_API_KEY = (process.env as any).REACT_APP_DIDIT_API_KEY || '';
 
 export interface DiditSession {
