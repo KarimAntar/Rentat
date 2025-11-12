@@ -26,6 +26,7 @@ interface ChatScreenProps {
       chatId?: string;
       rentalId?: string;
       otherUserId?: string;
+      itemId?: string;
     };
   };
 }
@@ -38,10 +39,11 @@ interface MessageWithUser extends Message {
 const ChatScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { chatId, rentalId, otherUserId } = route.params as {
+  const { chatId, rentalId, otherUserId, itemId } = route.params as {
     chatId?: string;
     rentalId?: string;
     otherUserId?: string;
+    itemId?: string;
   };
   const { user } = useAuthContext();
 
@@ -162,13 +164,13 @@ const ChatScreen: React.FC = () => {
           activeChat = await ChatService.getOrCreateDirectChat(
             user.uid,
             otherUserId || 'unknown-user',
-            { type: rentalId ? 'rental' : 'general', rentalId }
+            { type: rentalId ? 'rental' : (itemId ? 'general' : 'general'), rentalId, itemId }
           );
         } else {
           activeChat = await ChatService.getOrCreateDirectChat(
             user.uid,
             otherUserId || 'unknown-user',
-            { type: rentalId ? 'rental' : 'general', rentalId }
+            { type: rentalId ? 'rental' : (itemId ? 'general' : 'general'), rentalId, itemId }
           );
         }
         console.log('Chat: Real Firebase chat created/found successfully!');
@@ -214,6 +216,7 @@ const ChatScreen: React.FC = () => {
         activeChat = {
           id: `mock-chat-${Date.now()}`,
           participants: [user.uid, otherUserId || 'mock-user'],
+          participantsKey: [user.uid, otherUserId || 'mock-user'].sort().join(':'),
           type: rentalId ? 'rental' : 'general',
           rentalId: rentalId || undefined,
           lastMessage: {

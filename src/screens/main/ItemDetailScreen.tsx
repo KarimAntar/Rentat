@@ -122,6 +122,10 @@ const ItemDetailScreen: React.FC = () => {
       Alert.alert('Sign In Required', 'Please sign in to contact the owner');
       return;
     }
+    if (item?.ownerId === user.uid) {
+      Alert.alert('Cannot Contact', 'You cannot contact yourself');
+      return;
+    }
     (navigation as any).navigate('Chat', {
       otherUserId: item?.ownerId,
       itemId,
