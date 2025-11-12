@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { diditKycService } from '../../services/diditKyc';
 import Button from '../../components/ui/Button';
@@ -60,6 +60,32 @@ const KYCVerificationScreen: React.FC = () => {
       };
     }, [])
   );
+
+  const handleDeepLinkResult = (status: string) => {
+    switch (status) {
+      case 'success':
+        setModalMessage(
+          'Your identity has been verified successfully! You now have access to all features including withdrawals and rental requests.'
+        );
+        setShowSuccessModal(true);
+        // Reload KYC info to get updated status
+        loadKycInfo();
+        break;
+      case 'failure':
+        setModalMessage(
+          'Verification failed. This could be due to image quality, document mismatch, or unsupported document type. Please try again or contact support.'
+        );
+        setShowErrorModal(true);
+        loadKycInfo();
+        break;
+      case 'cancelled':
+        setModalMessage(
+          'You cancelled the verification process. You can restart it anytime from this screen.'
+        );
+        setShowCanceledModal(true);
+        break;
+    }
+  };
 
   const loadKycInfo = async () => {
     if (!user) return;

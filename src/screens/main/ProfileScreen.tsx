@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../types';
@@ -48,6 +48,14 @@ const ProfileScreen: React.FC = () => {
     loadTierInfo();
     checkVerificationStatus();
   }, [user]);
+
+  // Refresh data when screen gains focus (e.g., returning from KYC screen)
+  useFocusEffect(
+    React.useCallback(() => {
+      checkVerificationStatus();
+      loadTierInfo();
+    }, [user])
+  );
 
   const checkVerificationStatus = async () => {
     if (!user) return;

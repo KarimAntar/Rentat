@@ -173,8 +173,8 @@ export class ReferralService {
         rewards: {
           referrer: {
             type: 'fixed',
-            amount: 1000, // $10 credit
-            description: '$10 credit when friend completes first rental',
+            amount: 1000, // 100 EGP credit
+            description: '100 EGP credit when friend completes first rental',
           },
           referee: {
             type: 'percentage',
@@ -291,25 +291,46 @@ export class ReferralService {
         throw new Error('Program not available');
       }
 
+      // Deactivate all existing codes for this user
+      const existingCodesQuery = query(
+        collection(db, 'referral_codes'),
+        where('userId', '==', userId),
+        where('isActive', '==', true)
+      );
+      const existingCodesSnapshot = await getDocs(existingCodesQuery);
+
+      // Deactivate existing codes
+      const deactivatePromises = existingCodesSnapshot.docs.map(codeDoc =>
+        updateDoc(codeDoc.ref, {
+          isActive: false,
+          updatedAt: serverTimestamp(),
+        })
+      );
+      await Promise.all(deactivatePromises);
+
       // Generate unique code
       let code = customCode;
       if (!code) {
         const userDoc = await getDoc(doc(db, collections.users, userId));
         const user = userDoc.data() as User;
-        const baseName = user?.displayName?.replace(/\s+/g, '').substring(0, 8) || 'USER';
-        code = `${baseName}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        const firstLetter = user?.displayName?.charAt(0)?.toUpperCase() || 'U';
+        // Generate 6-character random string (letters and numbers)
+        const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase();
+        code = `${firstLetter}${randomChars}`;
       }
 
-      // Check if code already exists
+      // Check if code already exists (very unlikely but check anyway)
       const existingCodeQuery = query(
         collection(db, 'referral_codes'),
         where('code', '==', code)
       );
       const existingSnapshot = await getDocs(existingCodeQuery);
-      
+
       if (!existingSnapshot.empty) {
-        // Generate new random code
-        code = `REF${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        // Generate new random code if collision
+        const firstLetter = code.charAt(0);
+        const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase();
+        code = `${firstLetter}${randomChars}`;
       }
 
       // Calculate expiry date

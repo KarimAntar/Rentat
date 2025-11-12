@@ -271,7 +271,7 @@ const MainNavigator: React.FC = () => {
   );
 };
 
-// Linking configuration for web URLs
+// Linking configuration for web URLs and deep links
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['https://rentat.app', 'rentat://', '/'],
   config: {
@@ -312,6 +312,13 @@ const linking: LinkingOptions<RootStackParamList> = {
         },
       },
       Verification: 'verification',
+      KYCVerification: {
+        path: 'kyc-result',
+        parse: {
+          status: (status: string) => status,
+          userId: (userId: string) => userId,
+        },
+      },
     },
   },
 };

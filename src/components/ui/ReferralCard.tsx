@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ReferralCode, ReferralProgram } from '../../services/referrals';
+import { ReferralCode, ReferralProgram, ReferralStats } from '../../services/referrals';
 
 interface ReferralCardProps {
   referralCode: ReferralCode;
   program: ReferralProgram;
+  stats: ReferralStats;
   onShare?: () => void;
   onCopy?: () => void;
 }
@@ -13,6 +14,7 @@ interface ReferralCardProps {
 export const ReferralCard: React.FC<ReferralCardProps> = ({
   referralCode,
   program,
+  stats,
   onShare,
   onCopy,
 }) => {
@@ -20,7 +22,7 @@ export const ReferralCard: React.FC<ReferralCardProps> = ({
     if (reward.type === 'percentage') {
       return `${reward.amount}%`;
     } else if (reward.type === 'fixed') {
-      return `$${(reward.amount / 100).toFixed(0)}`;
+      return `${(reward.amount / 100).toFixed(0)} EGP`;
     } else {
       return `${reward.amount} credits`;
     }
@@ -103,15 +105,13 @@ export const ReferralCard: React.FC<ReferralCardProps> = ({
 
       <View style={styles.statsSection}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{referralCode.usageCount}</Text>
+          <Text style={styles.statValue}>{stats.totalReferrals}</Text>
           <Text style={styles.statLabel}>Friends Referred</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {referralCode.maxUsage ? referralCode.maxUsage - referralCode.usageCount : '∞'}
-          </Text>
-          <Text style={styles.statLabel}>Remaining</Text>
+          <Text style={styles.statValue}>{(stats.totalRewardsEarned / 100).toFixed(0)} EGP</Text>
+          <Text style={styles.statLabel}>Total Earned</Text>
         </View>
       </View>
 

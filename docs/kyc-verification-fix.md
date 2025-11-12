@@ -27,9 +27,9 @@
 
 Added redirect URLs to the Didit session creation:
 ```javascript
-success_url: `https://rentat-app.web.app/kyc-success?userId=${userId}`,
-failure_url: `https://rentat-app.web.app/kyc-failure?userId=${userId}`,
-cancel_url: `https://rentat-app.web.app/kyc-cancelled?userId=${userId}`
+success_url: `https://rentat.vercel.app/kyc-success?userId=${userId}`,
+failure_url: `https://rentat.vercel.app/kyc-failure?userId=${userId}`,
+cancel_url: `https://rentat.vercel.app/kyc-cancelled?userId=${userId}`
 ```
 
 These URLs are passed to Didit API when creating a verification session, so Didit knows where to redirect users after they complete or cancel the verification process.

@@ -199,29 +199,26 @@
         </div>
 
         <div class="buttons">
-            <a href="rentat://" class="button button-primary" onclick="closeWindow()">Return to App</a>
+            <a href="#" class="button button-primary" onclick="returnToApp()">Return to App</a>
             <a href="mailto:support@rentat.com" class="button button-secondary">Contact Support</a>
         </div>
         
-        <p class="auto-close" id="countdown">This page will close automatically in 15 seconds...</p>
+        <p class="auto-close" id="countdown">Redirecting you back to the app...</p>
     </div>
 
     <script>
-        let seconds = 15;
-        const countdownElement = document.getElementById('countdown');
+        // Extract userId from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('userId');
 
-        function updateCountdown() {
-            seconds--;
-            if (seconds > 0) {
-                countdownElement.textContent = `This page will close automatically in ${seconds} seconds...`;
-            } else {
-                closeWindow();
-            }
-        }
-
-        function closeWindow() {
+        function returnToApp() {
+            // Create deep link with status and userId
+            const deepLink = userId 
+                ? `rentat://kyc-result?status=failure&userId=${userId}`
+                : 'rentat://kyc-result?status=failure';
+            
             // Try to redirect to the app
-            window.location.href = 'rentat://';
+            window.location.href = deepLink;
             
             // After a short delay, try to close the window
             setTimeout(() => {
@@ -229,13 +226,18 @@
                 
                 // If window.close() doesn't work, show a message
                 setTimeout(() => {
-                    countdownElement.textContent = 'You can now close this window and return to the app.';
+                    const countdownElement = document.getElementById('countdown');
+                    if (countdownElement) {
+                        countdownElement.textContent = 'You can now close this window and return to the app.';
+                    }
                 }, 500);
             }, 1000);
         }
 
-        // Start countdown
-        setInterval(updateCountdown, 1000);
+        // Automatically redirect after 3 seconds
+        setTimeout(() => {
+            returnToApp();
+        }, 3000);
     </script>
 </body>
 </html>

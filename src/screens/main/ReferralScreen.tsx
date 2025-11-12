@@ -161,21 +161,23 @@ const ReferralScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Referral Codes */}
-        {referralCodes.map((code) => {
-          const program = getProgramForCode(code);
-          if (!program) return null;
+        {/* Active Referral Code */}
+        {referralCodes.length > 0 && (() => {
+          const activeCode = referralCodes.find(code => code.isActive) || referralCodes[0];
+          const program = getProgramForCode(activeCode);
+          if (!program || !stats) return null;
 
           return (
             <ReferralCard
-              key={code.id}
-              referralCode={code}
+              key={activeCode.id}
+              referralCode={activeCode}
               program={program}
+              stats={stats}
               onShare={handleShareCode}
-              onCopy={() => handleCopyCode(code.code)}
+              onCopy={() => handleCopyCode(activeCode.code)}
             />
           );
-        })}
+        })()}
 
         {/* Generate Button */}
         {referralCodes.length < 3 && (
