@@ -327,6 +327,40 @@ export class RentalService extends FirestoreService {
     ]);
   }
 
+  static async getOwnerRentalRequests(ownerId: string): Promise<Rental[]> {
+    return this.getMany<Rental>(collections.rentals, [
+      where('ownerId', '==', ownerId),
+      orderBy('createdAt', 'desc')
+    ]);
+  }
+
+  static async approveRental(rentalId: string): Promise<void> {
+    try {
+      const rental = await this.getRental(rentalId);
+      if (!rental) {
+        throw new Error('Rental not found');
+      }
+
+      return this.update<Rental>(collections.rentals, rentalId, {
+        status: 'approved',
+        dates: {
+          ...rental.dates,
+          confirmedStart: rental.dates.requestedStart,
+          confirmedEnd: rental.dates.requestedEnd,
+        },
+      });
+    } catch (error) {
+      console.error('Error approving rental:', error);
+      throw error;
+    }
+  }
+
+  static async rejectRental(rentalId: string): Promise<void> {
+    return this.update<Rental>(collections.rentals, rentalId, {
+      status: 'rejected',
+    });
+  }
+
   static subscribeToUserRentals(
     userId: string,
     callback: (rentals: Rental[]) => void,

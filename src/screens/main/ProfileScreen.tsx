@@ -324,21 +324,17 @@ const ProfileScreen: React.FC = () => {
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="list-outline" size={24} color="#6B7280" />
-            <Text style={styles.menuText}>My Listings</Text>
-            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="time-outline" size={24} color="#6B7280" />
-            <Text style={styles.menuText}>Rental History</Text>
-            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="heart-outline" size={24} color="#6B7280" />
-            <Text style={styles.menuText}>Favorites</Text>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              const parentNavigation = navigation.getParent();
+              if (parentNavigation) {
+                parentNavigation.navigate('RentalRequests');
+              }
+            }}
+          >
+            <Ionicons name="document-text-outline" size={24} color="#6B7280" />
+            <Text style={styles.menuText}>Rental Requests</Text>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
 
@@ -347,31 +343,38 @@ const ProfileScreen: React.FC = () => {
             onPress={() => {
               const parentNavigation = navigation.getParent();
               if (parentNavigation) {
-                parentNavigation.navigate('Referral');
+                parentNavigation.navigate('MyListings');
               }
             }}
           >
-            <Ionicons name="gift-outline" size={24} color="#6B7280" />
-            <Text style={styles.menuText}>Referrals</Text>
+            <Ionicons name="list-outline" size={24} color="#6B7280" />
+            <Text style={styles.menuText}>My Listings</Text>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => setSubscriptionModalVisible(true)}
+            onPress={() => {
+              const parentNavigation = navigation.getParent();
+              if (parentNavigation) {
+                parentNavigation.navigate('RentalHistory');
+              }
+            }}
           >
-            <Ionicons name="ribbon-outline" size={24} color="#6B7280" />
-            <Text style={styles.menuText}>Subscription</Text>
+            <Ionicons name="time-outline" size={24} color="#6B7280" />
+            <Text style={styles.menuText}>Rental History</Text>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <Ionicons name="settings-outline" size={24} color="#6B7280" />
-            <Text style={styles.menuText}>Settings</Text>
-            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              const parentNavigation = navigation.getParent();
+              if (parentNavigation) {
+                parentNavigation.navigate('HelpSupport');
+              }
+            }}
+          >
             <Ionicons name="help-circle-outline" size={24} color="#6B7280" />
             <Text style={styles.menuText}>Help & Support</Text>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />

@@ -123,7 +123,7 @@ const ReferralScreen: React.FC = () => {
                 <Text style={styles.statLabel}>Qualified</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statValue}>${(stats.totalRewardsEarned / 100).toFixed(0)}</Text>
+                <Text style={styles.statValue}>{(stats.totalRewardsEarned / 100).toFixed(0)} EGP</Text>
                 <Text style={styles.statLabel}>Earned</Text>
               </View>
             </View>

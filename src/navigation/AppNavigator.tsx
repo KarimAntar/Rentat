@@ -21,6 +21,10 @@ import ReferralScreen from '../screens/main/ReferralScreen';
 import CreateItemScreen from '../screens/main/CreateItemScreen';
 import EditItemScreen from '../screens/main/EditItemScreen';
 import ItemDetailScreen from '../screens/main/ItemDetailScreen';
+import RentalRequestsScreen from '../screens/main/RentalRequestsScreen';
+import MyListingsScreen from '../screens/main/MyListingsScreen';
+import RentalHistoryScreen from '../screens/main/RentalHistoryScreen';
+import HelpSupportScreen from '../screens/main/HelpSupportScreen';
 import LoadingScreen from '../components/LoadingScreen';
 import PWAInstallPrompt from '../components/PWAInstallPrompt';
 
@@ -356,6 +360,26 @@ const AppNavigator: React.FC = () => {
           name="EmailVerification"
           component={EmailVerificationScreen}
           options={{ headerShown: true, title: 'Verify Email' }}
+        />
+        <RootStack.Screen
+          name="RentalRequests"
+          component={RentalRequestsScreen}
+          options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="MyListings"
+          component={MyListingsScreen}
+          options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="RentalHistory"
+          component={RentalHistoryScreen}
+          options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="HelpSupport"
+          component={HelpSupportScreen}
+          options={{ headerShown: false }}
         />
       </RootStack.Navigator>
 

@@ -646,6 +646,10 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Review: { rentalId: string; reviewType: 'owner-to-renter' | 'renter-to-owner' };
   RentalRequest: { itemId: string };
+  RentalRequests: undefined;
+  MyListings: undefined;
+  RentalHistory: undefined;
+  HelpSupport: undefined;
   Chat: { chatId: string };
   Profile: { userId?: string };
   Settings: undefined;

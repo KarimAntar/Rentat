@@ -22,7 +22,7 @@ export const ReferralCard: React.FC<ReferralCardProps> = ({
     if (reward.type === 'percentage') {
       return `${reward.amount}%`;
     } else if (reward.type === 'fixed') {
-      return `${(reward.amount / 100).toFixed(0)} EGP`;
+      return `${(reward.amount / 10).toFixed(0)} EGP`;
     } else {
       return `${reward.amount} credits`;
     }
@@ -115,10 +115,7 @@ export const ReferralCard: React.FC<ReferralCardProps> = ({
         </View>
       </View>
 
-      <View style={styles.expirySection}>
-        <Ionicons name="time-outline" size={16} color="#6B7280" />
-        <Text style={styles.expiryText}>{getExpiryText()}</Text>
-      </View>
+
 
       <View style={styles.actionsSection}>
         <TouchableOpacity onPress={handleShare} style={styles.shareButton}>
