@@ -336,6 +336,7 @@ export interface RentalTimelineEvent {
 export interface Chat {
   id: string;
   participants: string[];
+  participantsKey: string;
   type: 'rental' | 'general';
   rentalId?: string;
   itemId?: string;
@@ -662,6 +663,7 @@ export type RootStackParamList = {
   Reviews: { userId?: string; itemId?: string };
   Search: { filters?: Partial<SearchFilters> };
   Map: { filters?: Partial<SearchFilters> };
+  PaymobTest: undefined;
 };
 
 export type AuthStackParamList = {

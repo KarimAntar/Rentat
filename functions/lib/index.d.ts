@@ -26,3 +26,7 @@ export declare const onRentalCreated: import("firebase-functions/core").CloudFun
 export declare const onRentalUpdated: import("firebase-functions/core").CloudFunction<import("firebase-functions/v2/firestore").FirestoreEvent<import("firebase-functions/v2").Change<import("firebase-functions/v2/firestore").QueryDocumentSnapshot> | undefined, {
     rentalId: string;
 }>>;
+export declare const onMessageCreated: import("firebase-functions/core").CloudFunction<import("firebase-functions/v2/firestore").FirestoreEvent<import("firebase-functions/v2/firestore").QueryDocumentSnapshot | undefined, {
+    chatId: string;
+    messageId: string;
+}>>;

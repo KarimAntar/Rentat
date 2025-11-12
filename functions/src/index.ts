@@ -568,7 +568,7 @@ export const onRentalCreated = onDocumentCreated('rentals/{rentalId}', async (ev
 export const onRentalUpdated = onDocumentUpdated('rentals/{rentalId}', async (event) => {
   const before = event.data?.before.data();
   const after = event.data?.after.data();
-  
+
   if (!before || !after) return;
 
   try {
@@ -578,6 +578,100 @@ export const onRentalUpdated = onDocumentUpdated('rentals/{rentalId}', async (ev
     }
   } catch (error) {
     console.error('Error handling rental update:', error);
+  }
+});
+
+// Trigger when a new chat message is created
+export const onMessageCreated = onDocumentCreated('chats/{chatId}/messages/{messageId}', async (event) => {
+  const message = event.data?.data();
+  if (!message) return;
+
+  try {
+    const chatId = event.params.chatId;
+    const messageId = event.params.messageId;
+
+    // Get chat document to find participants
+    const chatRef = db.collection('chats').doc(chatId);
+    const chatDoc = await chatRef.get();
+
+    if (!chatDoc.exists) return;
+
+    const chat = chatDoc.data()!;
+    const participants: string[] = chat.participants || [];
+
+    // Get sender info
+    const senderId = message.senderId;
+    const senderDoc = await db.collection('users').doc(senderId).get();
+    const sender = senderDoc.data();
+
+    // Send notifications to all participants except sender
+    const notifications = participants
+      .filter(uid => uid !== senderId)
+      .map(async (userId) => {
+        const userDoc = await db.collection('users').doc(userId).get();
+        const user = userDoc.data();
+
+        if (!user?.fcmTokens?.length) return;
+
+        // Create notification document
+        await db.collection('notifications').add({
+          userId,
+          type: 'message',
+          title: `${sender?.displayName || 'Someone'} sent a message`,
+          body: message.content?.text || 'New message',
+          data: {
+            chatId,
+            messageId,
+            senderId,
+            type: message.type,
+          },
+          status: 'unread',
+          delivery: {
+            push: { sent: false },
+          },
+          priority: 'normal',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Send push notification
+        const pushMessage = {
+          notification: {
+            title: `${sender?.displayName || 'Someone'} sent a message`,
+            body: message.content?.text || 'New message',
+          },
+          data: {
+            chatId,
+            messageId,
+            senderId,
+            type: message.type,
+            click_action: 'FLUTTER_NOTIFICATION_CLICK',
+          },
+          tokens: user.fcmTokens,
+        };
+
+        try {
+          await admin.messaging().sendMulticast(pushMessage);
+          console.log(`Push notification sent to user ${userId} for message ${messageId}`);
+        } catch (pushError) {
+          console.error(`Failed to send push notification to user ${userId}:`, pushError);
+        }
+      });
+
+    await Promise.all(notifications);
+
+    // Update unread counts for participants
+    const unreadUpdates = participants
+      .filter(uid => uid !== senderId)
+      .map(uid =>
+        chatRef.update({
+          [`metadata.unreadCount.${uid}`]: admin.firestore.FieldValue.increment(1),
+        })
+      );
+
+    await Promise.all(unreadUpdates);
+
+  } catch (error) {
+    console.error('Error handling message creation:', error);
   }
 });
 

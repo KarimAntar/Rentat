@@ -381,6 +381,11 @@ const AppNavigator: React.FC = () => {
           component={HelpSupportScreen}
           options={{ headerShown: false }}
         />
+        <RootStack.Screen
+          name="PaymobTest"
+          component={require('../screens/main/PaymobTestScreen').default}
+          options={{ headerShown: false }}
+        />
       </RootStack.Navigator>
 
       {/* PWA Install Prompt - Only shows on Chrome for Android */}

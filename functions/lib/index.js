@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onRentalUpdated = exports.onRentalCreated = exports.completeRental = exports.processRentalResponse = exports.processRentalRequest = exports.webhooks = void 0;
+exports.onMessageCreated = exports.onRentalUpdated = exports.onRentalCreated = exports.completeRental = exports.processRentalResponse = exports.processRentalRequest = exports.webhooks = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
@@ -544,6 +544,90 @@ exports.onRentalUpdated = (0, firestore_1.onDocumentUpdated)('rentals/{rentalId}
     }
     catch (error) {
         console.error('Error handling rental update:', error);
+    }
+});
+// Trigger when a new chat message is created
+exports.onMessageCreated = (0, firestore_1.onDocumentCreated)('chats/{chatId}/messages/{messageId}', async (event) => {
+    var _a;
+    const message = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+    if (!message)
+        return;
+    try {
+        const chatId = event.params.chatId;
+        const messageId = event.params.messageId;
+        // Get chat document to find participants
+        const chatRef = db.collection('chats').doc(chatId);
+        const chatDoc = await chatRef.get();
+        if (!chatDoc.exists)
+            return;
+        const chat = chatDoc.data();
+        const participants = chat.participants || [];
+        // Get sender info
+        const senderId = message.senderId;
+        const senderDoc = await db.collection('users').doc(senderId).get();
+        const sender = senderDoc.data();
+        // Send notifications to all participants except sender
+        const notifications = participants
+            .filter(uid => uid !== senderId)
+            .map(async (userId) => {
+            var _a, _b, _c;
+            const userDoc = await db.collection('users').doc(userId).get();
+            const user = userDoc.data();
+            if (!((_a = user === null || user === void 0 ? void 0 : user.fcmTokens) === null || _a === void 0 ? void 0 : _a.length))
+                return;
+            // Create notification document
+            await db.collection('notifications').add({
+                userId,
+                type: 'message',
+                title: `${(sender === null || sender === void 0 ? void 0 : sender.displayName) || 'Someone'} sent a message`,
+                body: ((_b = message.content) === null || _b === void 0 ? void 0 : _b.text) || 'New message',
+                data: {
+                    chatId,
+                    messageId,
+                    senderId,
+                    type: message.type,
+                },
+                status: 'unread',
+                delivery: {
+                    push: { sent: false },
+                },
+                priority: 'normal',
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            // Send push notification
+            const pushMessage = {
+                notification: {
+                    title: `${(sender === null || sender === void 0 ? void 0 : sender.displayName) || 'Someone'} sent a message`,
+                    body: ((_c = message.content) === null || _c === void 0 ? void 0 : _c.text) || 'New message',
+                },
+                data: {
+                    chatId,
+                    messageId,
+                    senderId,
+                    type: message.type,
+                    click_action: 'FLUTTER_NOTIFICATION_CLICK',
+                },
+                tokens: user.fcmTokens,
+            };
+            try {
+                await admin.messaging().sendMulticast(pushMessage);
+                console.log(`Push notification sent to user ${userId} for message ${messageId}`);
+            }
+            catch (pushError) {
+                console.error(`Failed to send push notification to user ${userId}:`, pushError);
+            }
+        });
+        await Promise.all(notifications);
+        // Update unread counts for participants
+        const unreadUpdates = participants
+            .filter(uid => uid !== senderId)
+            .map(uid => chatRef.update({
+            [`metadata.unreadCount.${uid}`]: admin.firestore.FieldValue.increment(1),
+        }));
+        await Promise.all(unreadUpdates);
+    }
+    catch (error) {
+        console.error('Error handling message creation:', error);
     }
 });
 // Helper functions

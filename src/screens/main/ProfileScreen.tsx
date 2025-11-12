@@ -379,6 +379,20 @@ const ProfileScreen: React.FC = () => {
             <Text style={styles.menuText}>Help & Support</Text>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              const parentNavigation = navigation.getParent();
+              if (parentNavigation) {
+                parentNavigation.navigate('PaymobTest');
+              }
+            }}
+          >
+            <Ionicons name="card-outline" size={24} color="#6B7280" />
+            <Text style={styles.menuText}>🧪 Test Paymob Payment</Text>
+            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
+          </TouchableOpacity>
         </View>
 
         <Button
