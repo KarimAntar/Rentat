@@ -341,14 +341,19 @@ export class RentalService extends FirestoreService {
         throw new Error('Rental not found');
       }
 
-      return this.update<Rental>(collections.rentals, rentalId, {
+      // Update status and confirmed dates separately to comply with Firestore rules
+      await this.update<Rental>(collections.rentals, rentalId, {
         status: 'approved',
-        dates: {
-          ...rental.dates,
-          confirmedStart: rental.dates.requestedStart,
-          confirmedEnd: rental.dates.requestedEnd,
-        },
       });
+
+      // Update confirmed dates using Firestore field paths
+      const docRef = doc(db, collections.rentals, rentalId);
+      await updateDoc(docRef, {
+        'dates.confirmedStart': rental.dates.requestedStart,
+        'dates.confirmedEnd': rental.dates.requestedEnd,
+        updatedAt: serverTimestamp(),
+      });
+
     } catch (error) {
       console.error('Error approving rental:', error);
       throw error;
