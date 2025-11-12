@@ -300,8 +300,11 @@ export const processRentalRequest = onCall(async (request) => {
     const rentalRef = await db.collection('rentals').add(rentalData);
 
     // Create chat for communication
+    const participants = [auth.uid, item.ownerId];
+    const participantsKey = participants.sort().join(':');
     const chatData = {
-      participants: [auth.uid, item.ownerId],
+      participants,
+      participantsKey,
       type: 'rental',
       rentalId: rentalRef.id,
       itemId,

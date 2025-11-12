@@ -58,6 +58,7 @@ const mapChatDoc = (id: string, data: any): Chat => {
   return {
     id,
     participants: data.participants || [],
+    participantsKey: data.participantsKey || '',
     type: data.type || 'general',
     rentalId: data.rentalId,
     itemId: data.itemId,
