@@ -79,8 +79,12 @@ const RentalHistoryScreen: React.FC = () => {
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (date: any) => {
+    // Handle Firestore Timestamp objects
+    const dateObj = date?.toDate ? date.toDate() : date;
+    if (!(dateObj instanceof Date)) return 'Invalid date';
+
+    return dateObj.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
