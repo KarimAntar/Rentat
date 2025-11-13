@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, Dimensions, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Dimensions, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { NavigationContainer, LinkingOptions, CommonActions } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthContext } from '../contexts/AuthContext';
+import { db, collections } from '../config/firebase';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -83,6 +85,30 @@ const AuthNavigator: React.FC = () => {
 // Custom Tab Bar Component - Always shows text below icons
 const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
   const { user } = useAuthContext();
+  const [unreadCount, setUnreadCount] = React.useState(0);
+
+  // Subscribe to unread messages count
+  React.useEffect(() => {
+    if (!user) return;
+
+    const chatsQuery = query(
+      collection(db, collections.chats),
+      where('participants', 'array-contains', user.uid),
+      orderBy('updatedAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(chatsQuery, (snapshot) => {
+      let totalUnread = 0;
+      snapshot.docs.forEach((doc) => {
+        const chatData = doc.data();
+        const unreadForUser = chatData.metadata?.unreadCount?.[user.uid] || 0;
+        totalUnread += unreadForUser;
+      });
+      setUnreadCount(totalUnread);
+    });
+
+    return unsubscribe;
+  }, [user]);
 
   return (
     <View style={styles.tabBarContainer}>
@@ -106,8 +132,8 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
         } else if (route.name === 'AddItem') {
           iconName = isFocused ? 'add-circle' : 'add-circle-outline';
         } else if (route.name === 'Messages') {
-          iconName = isFocused ? 'wallet' : 'wallet-outline';
-        } else if (route.name === 'Profile') {
+          iconName = isFocused ? 'chatbubble' : 'chatbubble-outline';
+        } else if (route.name === 'Account') {
           iconName = isFocused ? 'person' : 'person-outline';
         }
 
@@ -150,11 +176,20 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
             onLongPress={onLongPress}
             style={styles.tabBarItem}
           >
-            <Ionicons
-              name={iconName}
-              size={isFocused ? 24 : 22}
-              color={isFocused ? '#4639eb' : '#6B7280'}
-            />
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={iconName}
+                size={isFocused ? 24 : 22}
+                color={isFocused ? '#4639eb' : '#6B7280'}
+              />
+              {route.name === 'Messages' && unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadBadgeText}>
+                    {unreadCount > 99 ? '99+' : unreadCount.toString()}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text
               style={[
                 styles.tabBarLabel,
@@ -207,12 +242,23 @@ const GlobalHeader: React.FC<{ title?: string; navigation?: any }> = ({ title, n
   return (
     <View style={styles.globalHeader}>
       <View style={styles.greetingSection}>
-        <Text style={styles.greetingText}>
-          {getGreeting()}
-        </Text>
-        <Text style={styles.greetingName}>
-          {getDisplayName()} 👋
-        </Text>
+        <View style={styles.greetingWithAvatar}>
+          {user?.photoURL ? (
+            <Image source={{ uri: user.photoURL }} style={styles.userAvatar} />
+          ) : (
+            <View style={styles.userAvatar}>
+              <Ionicons name="person" size={20} color="#6B7280" />
+            </View>
+          )}
+          <View style={styles.greetingTextContainer}>
+            <Text style={styles.greetingText}>
+              {getGreeting()}
+            </Text>
+            <Text style={styles.greetingName}>
+              {getDisplayName()} 👋
+            </Text>
+          </View>
+        </View>
       </View>
       <View style={styles.headerActions}>
         <TouchableOpacity style={styles.actionButton}>
@@ -259,16 +305,16 @@ const MainNavigator: React.FC = () => {
       />
       <MainTab.Screen
         name="Messages"
-        component={WalletScreen}
+        component={require('../screens/main/MessagesScreen').default}
         options={{
-          title: 'Wallet',
+          title: 'Messages',
         }}
       />
       <MainTab.Screen
-        name="Profile"
+        name="Account"
         component={ProfileScreen}
         options={{
-          title: 'Profile',
+          title: 'Account',
         }}
       />
     </MainTab.Navigator>
@@ -420,6 +466,29 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
+  iconContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  unreadBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+  },
   globalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -433,16 +502,34 @@ const styles = StyleSheet.create({
   greetingSection: {
     flex: 1,
   },
+  greetingWithAvatar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  greetingTextContainer: {
+    flex: 1,
+  },
   greetingText: {
     fontSize: 24,
     fontWeight: '700',
     color: '#111827',
+    textAlign: 'left',
   },
   greetingName: {
     fontSize: 20,
     fontWeight: '600',
     color: '#4639eb',
     marginTop: 4,
+    textAlign: 'left',
   },
   headerActions: {
     flexDirection: 'row',

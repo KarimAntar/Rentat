@@ -651,7 +651,8 @@ export type RootStackParamList = {
   MyListings: undefined;
   RentalHistory: undefined;
   HelpSupport: undefined;
-  Chat: { chatId: string };
+  Chat: { chatId?: string; rentalId?: string; otherUserId?: string; itemId?: string };
+  Messages: undefined;
   Profile: { userId?: string };
   Settings: undefined;
   Verification: undefined;
@@ -678,7 +679,7 @@ export type MainTabParamList = {
   Search: undefined;
   AddItem: undefined;
   Messages: undefined;
-  Profile: undefined;
+  Account: undefined;
 };
 
 // Hook Types

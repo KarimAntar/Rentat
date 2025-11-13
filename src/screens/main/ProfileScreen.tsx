@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, collections } from '../../config/firebase';
 import { UserSubscription } from '../../services/subscriptions';
 import { diditKycService } from '../../services/diditKyc';
+import { useUserBalance, useUserTransactions } from '../../hooks/useFirestore';
 
 interface TierInfo {
   currentTier: string;
@@ -43,6 +45,11 @@ const ProfileScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
+  const [kycVerified, setKycVerified] = useState(false);
+  const [kycLoading, setKycLoading] = useState(true);
+
+  const { balance, loading: balanceLoading, error: balanceError } = useUserBalance(user?.uid || null);
+  const { data: transactions, loading: transactionsLoading } = useUserTransactions(user?.uid || null);
 
   useEffect(() => {
     loadTierInfo();
@@ -159,6 +166,74 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
+  const handleWithdraw = async () => {
+    if (!user) return;
+
+    try {
+      // Check if user is KYC verified
+      await diditKycService.requireKycVerification(user.uid);
+
+      // Proceed with withdrawal
+      console.log('Proceed with withdrawal');
+      // TODO: Implement actual withdrawal flow
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+
+      if (errorMessage === 'KYC_REQUIRED') {
+        Alert.alert(
+          'Verification Required',
+          'You need to complete identity verification before you can withdraw funds. This helps keep our community safe and secure.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Verify Now',
+              onPress: () => {
+                const parentNavigation = navigation.getParent();
+                if (parentNavigation) {
+                  parentNavigation.navigate('KYCVerification');
+                }
+              }
+            }
+          ]
+        );
+      } else if (errorMessage === 'KYC_IN_PROGRESS') {
+        Alert.alert(
+          'Verification In Progress',
+          'Your identity verification is currently in progress. Please wait for it to be completed before withdrawing funds.'
+        );
+      } else if (errorMessage === 'KYC_IN_REVIEW') {
+        Alert.alert(
+          'Verification Under Review',
+          'Your identity verification is under review. We will notify you once it has been completed.'
+        );
+      } else if (errorMessage === 'KYC_REJECTED') {
+        Alert.alert(
+          'Verification Rejected',
+          'Your identity verification was rejected. Please contact support for more information.'
+        );
+      } else if (errorMessage === 'KYC_EXPIRED') {
+        Alert.alert(
+          'Verification Expired',
+          'Your identity verification has expired. Please complete the verification process again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Verify Again',
+              onPress: () => {
+                const parentNavigation = navigation.getParent();
+                if (parentNavigation) {
+                  parentNavigation.navigate('KYCVerification');
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to process withdrawal. Please try again.');
+      }
+    }
+  };
+
   // Get display name (first name only) or fallback
   const displayName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
   const email = user?.email || 'No email';
@@ -209,6 +284,38 @@ const ProfileScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Wallet Balance Card */}
+        <View style={styles.walletCard}>
+          <View style={styles.walletHeader}>
+            <Ionicons name="wallet" size={24} color="#4639eb" />
+            <Text style={styles.walletTitle}>Wallet Balance</Text>
+          </View>
+          {balanceLoading ? (
+            <ActivityIndicator size="large" color="#4639eb" style={styles.walletLoader} />
+          ) : (
+            <Text style={styles.walletAmount}>
+              EGP {balance.toFixed(2)}
+            </Text>
+          )}
+          {balanceError && (
+            <Text style={styles.errorText}>{balanceError}</Text>
+          )}
+          <View style={styles.walletActions}>
+            <Button
+              title={kycVerified ? "Withdraw" : "Verify to Withdraw"}
+              onPress={handleWithdraw}
+              style={styles.withdrawButton}
+              size="small"
+              disabled={balance <= 0 || kycLoading}
+            />
+          </View>
+          {!kycVerified && !kycLoading && (
+            <Text style={styles.kycWarning}>
+              Complete identity verification to unlock withdrawals
+            </Text>
+          )}
+        </View>
+
         {/* Commission Tier Card */}
         {loading ? (
           <View style={styles.tierCard}>
@@ -217,10 +324,10 @@ const ProfileScreen: React.FC = () => {
         ) : tierInfo && (
           <View style={styles.tierCard}>
             <View style={styles.tierHeader}>
-              <Ionicons 
-                name={getTierIcon(tierInfo.currentTier) as any} 
-                size={32} 
-                color={getTierColor(tierInfo.currentTier)} 
+              <Ionicons
+                name={getTierIcon(tierInfo.currentTier) as any}
+                size={32}
+                color={getTierColor(tierInfo.currentTier)}
               />
               <View style={styles.tierHeaderText}>
                 <Text style={styles.tierTitle}>Commission Tier</Text>
@@ -229,7 +336,7 @@ const ProfileScreen: React.FC = () => {
                 </Text>
               </View>
             </View>
-            
+
             <View style={styles.tierStats}>
               <View style={styles.tierStat}>
                 <Text style={styles.tierStatNumber}>{tierInfo.completedRentals}</Text>
@@ -255,20 +362,20 @@ const ProfileScreen: React.FC = () => {
                   </Text>
                 </View>
                 <View style={styles.progressBar}>
-                  <View 
+                  <View
                     style={[
-                      styles.progressFill, 
-                      { 
+                      styles.progressFill,
+                      {
                         width: `${Math.min(
                           (tierInfo.completedRentals / (tierInfo.completedRentals + tierInfo.nextTier.rentalsNeeded)) * 100,
                           100
-                        )}%` 
+                        )}%`
                       }
-                    ]} 
+                    ]}
                   />
                 </View>
                 <Text style={styles.nextTierBenefit}>
-                  Unlock {tierInfo.nextTier.nextRate}% commission rate 
+                  Unlock {tierInfo.nextTier.nextRate}% commission rate
                   (save {(tierInfo.nextTier.currentRate - tierInfo.nextTier.nextRate).toFixed(1)}% per rental!)
                 </Text>
               </View>
@@ -655,6 +762,56 @@ const styles = StyleSheet.create({
   },
   verificationButton: {
     minWidth: 160,
+  },
+  walletCard: {
+    backgroundColor: '#4639eb',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  walletHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  walletTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 12,
+  },
+  walletAmount: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 24,
+  },
+  walletLoader: {
+    marginVertical: 24,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#FCA5A5',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  walletActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 8,
+    gap: 16,
+  },
+  withdrawButton: {
+    minWidth: 140,
+  },
+  kycWarning: {
+    fontSize: 12,
+    color: '#F59E0B',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 

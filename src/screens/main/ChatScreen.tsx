@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { Chat, Message, User, Item, Rental } from '../../types';
-import ChatService from '../../services/chat';
+import ChatService, { mapChatDoc } from '../../services/chat';
 import { db, collections } from '../../config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -154,29 +154,35 @@ const ChatScreen: React.FC = () => {
       }
       setOtherUser(fetchedOther);
 
-      // 2. Try REAL Firebase chat first
-      console.log('Chat: Attempting real Firebase chat...');
-      let activeChat: Chat;
-      let useMockMode = false;
+      // 2. Check if chat exists - DON'T CREATE IT YET
+      console.log('Chat: Checking for existing chat...');
+      let existingChat: Chat | null = null;
 
-      try {
-        if (chatId) {
-          activeChat = await ChatService.getOrCreateDirectChat(
-            user.uid,
-            otherUserId || 'unknown-user',
-            { type: rentalId ? 'rental' : (itemId ? 'general' : 'general'), rentalId, itemId }
-          );
-        } else {
-          activeChat = await ChatService.getOrCreateDirectChat(
-            user.uid,
-            otherUserId || 'unknown-user',
-            { type: rentalId ? 'rental' : (itemId ? 'general' : 'general'), rentalId, itemId }
-          );
+      if (chatId) {
+        // If we have a chatId, try to load the existing chat
+        try {
+          const chatDoc = await getDoc(doc(db, collections.chats, chatId));
+          if (chatDoc.exists()) {
+            existingChat = mapChatDoc(chatDoc.id, chatDoc.data());
+            console.log('Chat: Existing chat found');
+          }
+        } catch (error) {
+          console.error('Chat: Error loading existing chat:', error);
         }
-        console.log('Chat: Real Firebase chat created/found successfully!');
+      } else {
+        // If no chatId, check if there's an existing chat between these users
+        existingChat = await ChatService.findChatByParticipants(
+          [user.uid, otherUserId || 'unknown-user'],
+          { type: rentalId ? 'rental' : (itemId ? 'general' : 'general'), rentalId, itemId }
+        );
+      }
 
-        // 3. Subscribe to real messages
-        const unsubscribeMessages = ChatService.subscribeToMessages(activeChat.id, (msgs) => {
+      if (existingChat) {
+        // Chat exists, set it up normally
+        console.log('Chat: Setting up existing chat');
+
+        // Subscribe to messages
+        const unsubscribeMessages = ChatService.subscribeToMessages(existingChat.id, (msgs) => {
           setMessages(
             msgs.map(m => ({
               id: m.id,
@@ -192,33 +198,34 @@ const ChatScreen: React.FC = () => {
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
         });
 
-        // 4. Subscribe to chat updates
-        const unsubscribeChat = ChatService.subscribeToChat(activeChat.id, updated => {
+        // Subscribe to chat updates
+        const unsubscribeChat = ChatService.subscribeToChat(existingChat.id, updated => {
           if (updated) setChat(updated);
         });
 
-        // 5. Mark as read
-        await ChatService.markAsRead(activeChat.id, user.uid);
+        // Mark as read if there are messages
+        if (existingChat.lastMessage.text) {
+          await ChatService.markAsRead(existingChat.id, user.uid);
+        }
 
-        setChat(activeChat);
+        setChat(existingChat);
 
         // Cleanup on unmount
         return () => {
           unsubscribeMessages();
           unsubscribeChat();
         };
+      } else {
+        // No existing chat - set up placeholder mode
+        console.log('Chat: No existing chat found, using placeholder mode');
 
-      } catch (firebaseError) {
-        console.error('Chat: Real Firebase chat failed, using mock mode:', firebaseError);
-        useMockMode = true;
-
-        // FALLBACK: Use mock data
-        activeChat = {
-          id: `mock-chat-${Date.now()}`,
-          participants: [user.uid, otherUserId || 'mock-user'],
-          participantsKey: [user.uid, otherUserId || 'mock-user'].sort().join(':'),
+        const placeholderChat: Chat = {
+          id: `placeholder-${Date.now()}`,
+          participants: [user.uid, otherUserId || 'unknown-user'],
+          participantsKey: [user.uid, otherUserId || 'unknown-user'].sort().join(':'),
           type: rentalId ? 'rental' : 'general',
           rentalId: rentalId || undefined,
+          itemId: itemId || undefined,
           lastMessage: {
             text: '',
             senderId: '',
@@ -233,39 +240,8 @@ const ChatScreen: React.FC = () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         };
-        setChat(activeChat);
-
-        // Add sample messages for testing
-        const sampleMessages: MessageWithUser[] = [
-          {
-            id: 'sample-1',
-            senderId: fetchedOther?.uid || 'mock-user',
-            type: 'text',
-            content: { text: 'Hi! I\'m interested in your item. Is it still available?' },
-            status: { sent: new Date(Date.now() - 300000), delivered: new Date(Date.now() - 299000), read: new Date(Date.now() - 295000) },
-            timestamp: new Date(Date.now() - 300000),
-            senderName: fetchedOther?.displayName || 'Other User',
-            senderAvatar: undefined,
-          },
-          {
-            id: 'sample-2',
-            senderId: user.uid,
-            type: 'text',
-            content: { text: 'Yes, it\'s still available! When would you like to rent it?' },
-            status: { sent: new Date(Date.now() - 240000), delivered: new Date(Date.now() - 239000), read: new Date(Date.now() - 238000) },
-            timestamp: new Date(Date.now() - 240000),
-            senderName: user.displayName || 'You',
-            senderAvatar: user.photoURL || undefined,
-          },
-        ];
-        setMessages(sampleMessages);
-
-        // Show info about fallback mode
-        Alert.alert(
-          'Chat System Initializing',
-          'Real chat functionality is being set up. Using testing mode for now - full chat will be available once Firebase rules propagate (usually 1-5 minutes).',
-          [{ text: 'Got it!' }]
-        );
+        setChat(placeholderChat);
+        setMessages([]); // Empty messages for new chat
       }
 
     } catch (error) {
@@ -284,7 +260,74 @@ const ChatScreen: React.FC = () => {
       const text = messageText.trim();
       setMessageText('');
 
-      // Try REAL Firebase message first
+      // Check if this is a placeholder chat - create real chat first
+      if (chat.id.startsWith('placeholder-')) {
+        try {
+          console.log('Chat: Creating real chat for first message...');
+          const realChat = await ChatService.getOrCreateDirectChat(
+            user.uid,
+            otherUserId || 'unknown-user',
+            {
+              type: chat.type,
+              rentalId: chat.rentalId,
+              itemId: chat.itemId
+            }
+          );
+
+          // Update to real chat
+          setChat(realChat);
+
+          // Now send the message to the real chat
+          console.log('Chat: Sending first message to real chat...');
+          await ChatService.sendMessage({
+            chatId: realChat.id,
+            senderId: user.uid,
+            content: { text },
+            type: 'text',
+          });
+
+          // Set up real-time subscriptions for the new chat
+          const unsubscribeMessages = ChatService.subscribeToMessages(realChat.id, (msgs) => {
+            setMessages(
+              msgs.map(m => ({
+                id: m.id,
+                senderId: m.senderId,
+                type: m.type,
+                content: m.content,
+                status: m.status,
+                timestamp: m.timestamp,
+                senderName: m.senderId === user.uid ? (user.displayName || 'You') : (otherUser?.displayName || 'User'),
+                senderAvatar: (m.senderId === user.uid ? user.photoURL : otherUser?.photoURL) || undefined,
+              }))
+            );
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+          });
+
+          const unsubscribeChat = ChatService.subscribeToChat(realChat.id, updated => {
+            if (updated) setChat(updated);
+          });
+
+          console.log('Chat: Real chat created and first message sent successfully!');
+          return;
+        } catch (firebaseError) {
+          console.error('Chat: Failed to create real chat:', firebaseError);
+
+          // Fall back to mock mode
+          const mockChat = {
+            ...chat,
+            id: `mock-chat-${Date.now()}`,
+          };
+          setChat(mockChat);
+
+          Alert.alert(
+            'Chat Mode Changed',
+            'Switched to testing mode. Your message will be sent in mock mode.',
+            [{ text: 'OK' }]
+          );
+        }
+      }
+
+      // Try REAL Firebase message for existing chats
       if (!chat.id.startsWith('mock-chat-')) {
         try {
           console.log('Chat: Sending real Firebase message...');
@@ -367,7 +410,8 @@ const ChatScreen: React.FC = () => {
     }
   };
 
-  const formatTime = (timestamp: Date) => {
+  const formatTime = (timestamp: Date | undefined) => {
+    if (!timestamp) return '';
     return timestamp.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
@@ -378,18 +422,18 @@ const ChatScreen: React.FC = () => {
   const formatDate = (timestamp: Date) => {
     const today = new Date();
     const messageDate = new Date(timestamp);
-    
+
     if (messageDate.toDateString() === today.toDateString()) {
       return 'Today';
     }
-    
+
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     if (messageDate.toDateString() === yesterday.toDateString()) {
       return 'Yesterday';
     }
-    
+
     return messageDate.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -399,11 +443,11 @@ const ChatScreen: React.FC = () => {
   const renderMessage = ({ item: message, index }: { item: MessageWithUser; index: number }) => {
     const isMyMessage = message.senderId === user?.uid;
     const prevMessage = index > 0 ? messages[index - 1] : null;
-    const showDateHeader = !prevMessage || 
+    const showDateHeader = !prevMessage ||
       formatDate(message.timestamp) !== formatDate(prevMessage.timestamp);
-    
+
     const showAvatar = !isMyMessage && (
-      !messages[index + 1] || 
+      !messages[index + 1] ||
       messages[index + 1].senderId !== message.senderId ||
       formatDate(message.timestamp) !== formatDate(messages[index + 1].timestamp)
     );
@@ -417,7 +461,7 @@ const ChatScreen: React.FC = () => {
             </Text>
           </View>
         )}
-        
+
         <View style={[
           styles.messageContainer,
           isMyMessage ? styles.myMessageContainer : styles.otherMessageContainer,
@@ -430,11 +474,11 @@ const ChatScreen: React.FC = () => {
               style={styles.messageAvatar}
             />
           )}
-          
+
           {!isMyMessage && !showAvatar && (
             <View style={styles.messageSpacer} />
           )}
-          
+
           <View style={[
             styles.messageBubble,
             isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble,
@@ -445,7 +489,7 @@ const ChatScreen: React.FC = () => {
             ]}>
               {message.content.text}
             </Text>
-            
+
             <View style={styles.messageFooter}>
               <Text style={[
                 styles.messageTime,
@@ -453,16 +497,20 @@ const ChatScreen: React.FC = () => {
               ]}>
                 {formatTime(message.timestamp)}
               </Text>
-              
+
               {isMyMessage && (
                 <View style={styles.messageStatus}>
-                  {message.status.read ? (
-                    <Ionicons name="checkmark-done" size={14} color="#10B981" />
-                  ) : message.status.delivered ? (
-                    <Ionicons name="checkmark-done" size={14} color="#6B7280" />
-                  ) : (
-                    <Ionicons name="checkmark" size={14} color="#6B7280" />
-                  )}
+                  {(() => {
+                    // WhatsApp-style: check if this message was read by the other participant (permanent)
+                    const otherUserId = chat?.participants.find(p => p !== user?.uid);
+                    const isRead = chat?.metadata?.unreadCount?.[otherUserId || ''] === 0;
+
+                    if (isRead) {
+                      return <Ionicons name="checkmark-done-outline" size={16} color="#4639eb" />;
+                    } else {
+                      return <Ionicons name="checkmark-outline" size={16} color="#6B7280" />;
+                    }
+                  })()}
                 </View>
               )}
             </View>
@@ -484,8 +532,8 @@ const ChatScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={styles.container} 
+      <KeyboardAvoidingView
+        style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* Header */}
@@ -496,7 +544,7 @@ const ChatScreen: React.FC = () => {
           >
             <Ionicons name="arrow-back" size={24} color="#111827" />
           </TouchableOpacity>
-          
+
           <View style={styles.headerInfo}>
             <Image
               source={{
@@ -529,7 +577,7 @@ const ChatScreen: React.FC = () => {
               </View>
             </View>
           </View>
-          
+
           <TouchableOpacity style={styles.callButton}>
             <Ionicons name="call-outline" size={20} color="#4639eb" />
           </TouchableOpacity>
@@ -566,7 +614,7 @@ const ChatScreen: React.FC = () => {
           <TouchableOpacity style={styles.attachButton}>
             <Ionicons name="camera-outline" size={24} color="#6B7280" />
           </TouchableOpacity>
-          
+
           <TextInput
             style={styles.messageInput}
             placeholder="Type a message..."
@@ -577,7 +625,7 @@ const ChatScreen: React.FC = () => {
             onSubmitEditing={sendMessage}
             blurOnSubmit={false}
           />
-          
+
           <TouchableOpacity
             style={[
               styles.sendButton,
@@ -586,10 +634,10 @@ const ChatScreen: React.FC = () => {
             onPress={sendMessage}
             disabled={!messageText.trim() || sending}
           >
-            <Ionicons 
-              name={sending ? "hourglass-outline" : "send"} 
-              size={20} 
-              color={messageText.trim().length > 0 ? "#FFFFFF" : "#9CA3AF"} 
+            <Ionicons
+              name={sending ? "hourglass-outline" : "send"}
+              size={20}
+              color={messageText.trim().length > 0 ? "#FFFFFF" : "#9CA3AF"}
             />
           </TouchableOpacity>
         </View>
@@ -626,7 +674,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerInfo: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -644,6 +691,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     marginBottom: 2,
+    textAlign: 'left',
   },
   headerSubtitle: {
     flexDirection: 'row',
@@ -753,6 +801,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
     marginBottom: 4,
+    textAlign: 'left',
   },
   myMessageText: {
     color: '#FFFFFF',
@@ -777,6 +826,16 @@ const styles = StyleSheet.create({
   },
   messageStatus: {
     marginLeft: 4,
+  },
+  doubleCheckContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkOne: {
+    marginRight: -6,
+  },
+  checkTwo: {
+    marginLeft: -6,
   },
   contextCard: {
     backgroundColor: '#FFFFFF',

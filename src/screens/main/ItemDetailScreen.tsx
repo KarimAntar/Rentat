@@ -19,6 +19,7 @@ import Toast from 'react-native-toast-message';
 import { ItemService, UserService } from '../../services/firestore';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { authService } from '../../services/auth';
+import ChatService from '../../services/chat';
 import { Item, User } from '../../types';
 import { getCategoryById } from '../../data/categories';
 import { getGovernorateById } from '../../data/governorates';
@@ -117,19 +118,45 @@ const ItemDetailScreen: React.FC = () => {
     } catch (error) {}
   };
 
-  const handleContact = () => {
+  const handleContact = async () => {
     if (!user) {
       Alert.alert('Sign In Required', 'Please sign in to contact the owner');
       return;
     }
-    if (item?.ownerId === user.uid) {
+    if (!item || item.ownerId === user.uid) {
       Alert.alert('Cannot Contact', 'You cannot contact yourself');
       return;
     }
-    (navigation as any).navigate('Chat', {
-      otherUserId: item?.ownerId,
-      itemId,
-    });
+
+    try {
+      // Find existing chat or create new one
+      const existingChat = await ChatService.findChatByParticipants(
+        [user.uid, item.ownerId],
+        { itemId: item.id, type: 'general' }
+      );
+
+      let chatToNavigate = existingChat;
+      if (!existingChat) {
+        // Create new chat
+        chatToNavigate = await ChatService.getOrCreateDirectChat(
+          user.uid,
+          item.ownerId,
+          { itemId: item.id, type: 'general' }
+        );
+      }
+
+      if (chatToNavigate) {
+        // Navigate directly to the chat
+        (navigation as any).navigate('Chat', {
+          chatId: chatToNavigate.id,
+          otherUserId: item.ownerId,
+          itemId: item.id,
+        });
+      }
+    } catch (error) {
+      console.error('Error creating/finding chat:', error);
+      Alert.alert('Error', 'Failed to open chat. Please try again.');
+    }
   };
 
   const handleEdit = () => {

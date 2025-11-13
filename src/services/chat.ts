@@ -48,7 +48,7 @@ const toDate = (val: any): Date | undefined => {
   return typeof val.toDate === 'function' ? val.toDate() : new Date(val);
 };
 
-const mapChatDoc = (id: string, data: any): Chat => {
+export const mapChatDoc = (id: string, data: any): Chat => {
   const last: LastMessage = {
     text: data.lastMessage?.text || '',
     senderId: data.lastMessage?.senderId || '',
@@ -91,22 +91,37 @@ const mapMessageDoc = (id: string, data: any): Message => {
 
 export class ChatService {
   /**
-   * Find an existing chat by participantsKey (and optional rentalId/type)
+   * Find an existing chat by participants (and optional rentalId/type)
    */
   static async findChatByParticipants(
     participants: string[],
-    opts?: { type?: 'rental' | 'general'; rentalId?: string }
+    opts?: { type?: 'rental' | 'general'; rentalId?: string; itemId?: string }
   ): Promise<Chat | null> {
-    const participantsKey = buildParticipantsKey(participants);
-    const constraints: any[] = [where('participantsKey', '==', participantsKey)];
+    // Use array-contains queries which work reliably with Firestore security rules
+    // Query for chats where the first participant is in the participants array
+    const currentUserId = participants[0]; // Assume first participant is the current user
+
+    let constraints: any[] = [where('participants', 'array-contains', currentUserId)];
+
+    // Add additional filters
     if (opts?.type) constraints.push(where('type', '==', opts.type));
     if (opts?.rentalId) constraints.push(where('rentalId', '==', opts.rentalId));
+    if (opts?.itemId) constraints.push(where('itemId', '==', opts.itemId));
 
-    const q = query(collection(db, CHATS), ...constraints, limit(1));
+    const q = query(collection(db, CHATS), ...constraints, limit(20));
     const snap = await getDocs(q);
-    if (snap.empty) return null;
-    const d = snap.docs[0];
-    return mapChatDoc(d.id, d.data());
+
+    // Find chat that has exactly the right participants
+    for (const doc of snap.docs) {
+      const chatData = doc.data();
+      const chatParticipants = chatData.participants || [];
+      if (participants.every(p => chatParticipants.includes(p)) &&
+          chatParticipants.length === participants.length) {
+        return mapChatDoc(doc.id, doc.data());
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -116,9 +131,10 @@ export class ChatService {
     participants: string[],
     opts?: DirectChatOptions
   ): Promise<Chat> {
-    const participantsKey = buildParticipantsKey(participants);
+    const sortedParticipants = [...participants].sort(); // Ensure consistent ordering
+    const participantsKey = buildParticipantsKey(sortedParticipants);
     const chatPayload: any = {
-      participants,
+      participants: sortedParticipants,
       participantsKey,
       type: opts?.type || 'general',
       rentalId: opts?.rentalId || null,
@@ -151,10 +167,11 @@ export class ChatService {
     otherUserId: string,
     opts?: DirectChatOptions
   ): Promise<Chat> {
-    const participants = [currentUserId, otherUserId];
+    const participants = [currentUserId, otherUserId].sort(); // Sort for consistency
     const existing = await this.findChatByParticipants(participants, {
       type: opts?.type,
       rentalId: opts?.rentalId,
+      itemId: opts?.itemId,
     });
     if (existing) return existing;
     return this.createChat(participants, opts);
@@ -241,7 +258,7 @@ export class ChatService {
   }
 
   /**
-   * Mark all messages as read for a user in a chat (reset unread counter)
+   * Mark all messages as read for a user in a chat (reset unread counter and update read status on all messages)
    */
   static async markAsRead(chatId: string, userId: string): Promise<void> {
     const chatRef = doc(db, CHATS, chatId);
@@ -249,6 +266,21 @@ export class ChatService {
       [`metadata.unreadCount.${userId}`]: 0,
       updatedAt: serverTimestamp(),
     });
+
+    // Mark all messages as read for this user (permanent, WhatsApp-style)
+    const msgsRef = collection(db, CHATS, chatId, 'messages');
+    const q = query(msgsRef, where('senderId', '!=', userId));
+    const snap = await getDocs(q);
+    const now = new Date();
+    for (const docSnap of snap.docs) {
+      const msgData = docSnap.data();
+      // Only update if not already marked as read
+      if (!msgData.status?.read) {
+        await updateDoc(doc(msgsRef, docSnap.id), {
+          'status.read': serverTimestamp(),
+        });
+      }
+    }
   }
 }
 
