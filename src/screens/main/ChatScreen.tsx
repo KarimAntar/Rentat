@@ -622,7 +622,19 @@ const ChatScreen: React.FC = () => {
             onChangeText={setMessageText}
             multiline
             maxLength={1000}
-            onSubmitEditing={sendMessage}
+            onKeyPress={(e) => {
+              if (e.nativeEvent.key === 'Enter') {
+                // @ts-ignore - shiftKey exists in native event but not in types
+                if (e.nativeEvent.shiftKey) {
+                  // Shift+Enter: Allow default behavior (new line)
+                  return;
+                } else {
+                  // Enter: Send message and prevent default
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }
+            }}
             blurOnSubmit={false}
           />
 

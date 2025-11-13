@@ -575,47 +575,48 @@ const ItemDetailScreen: React.FC = () => {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: 16,
-            paddingBottom: 34,
+            padding: 12,
+            paddingBottom: 24,
             borderTop: '1px solid #E5E7EB',
             backgroundColor: '#FFFFFF',
-            gap: 16,
+            gap: 12,
             fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
             boxSizing: 'border-box',
           }}
         >
           <div style={{ flex: 1, fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif', boxSizing: 'border-box' }}>
-            <span style={{ fontSize: 20, fontWeight: 'bold', color: '#111827', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif' }}>
+            <div style={{ fontSize: 20, fontWeight: 'bold', color: '#111827', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif' }}>
               {formatPrice(item.pricing.dailyRate)}/day
-            </span>
-            <span style={{ fontSize: 12, color: '#6B7280', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif', marginLeft: 8 }}>
+            </div>
+            <div style={{ fontSize: 12, color: '#6B7280', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif' }}>
               +{formatPrice(item.pricing.securityDeposit)} deposit
-            </span>
+            </div>
           </div>
-          <button
-            style={{
-              minWidth: 140,
-              maxWidth: '100%',
-              width: 'auto',
-              backgroundColor: '#4639eb',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              padding: '12px 24px',
-              fontWeight: 'bold',
-              fontSize: 16,
-              fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
-              boxSizing: 'border-box',
-              marginLeft: 16,
-              cursor: item.availability.isAvailable && item.ownerId !== user?.uid ? 'pointer' : 'not-allowed',
-              opacity: item.availability.isAvailable && item.ownerId !== user?.uid ? 1 : 0.5,
-              overflow: 'hidden',
-            }}
-            disabled={!item.availability.isAvailable || item.ownerId === user?.uid}
-            onClick={handleRentRequest}
-          >
-            Request Rental
-          </button>
+          <div style={{ marginRight: 16 }}>
+            <button
+              style={{
+                minWidth: 140,
+                maxWidth: '100%',
+                width: 'auto',
+                backgroundColor: '#4639eb',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '12px 24px',
+                fontWeight: 'bold',
+                fontSize: 16,
+                fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif',
+                boxSizing: 'border-box',
+                cursor: item.availability.isAvailable && item.ownerId !== user?.uid ? 'pointer' : 'not-allowed',
+                opacity: item.availability.isAvailable && item.ownerId !== user?.uid ? 1 : 0.5,
+                overflow: 'hidden',
+              }}
+              disabled={!item.availability.isAvailable || item.ownerId === user?.uid}
+              onClick={handleRentRequest}
+            >
+              Request Rental
+            </button>
+          </div>
         </div>
       ) : (
         <View style={styles.bottomBar}>
@@ -627,12 +628,14 @@ const ItemDetailScreen: React.FC = () => {
               +{formatPrice(item.pricing.securityDeposit)} deposit
             </Text>
           </View>
-          <Button
-            title="Request Rental"
-            onPress={handleRentRequest}
-            disabled={!item.availability.isAvailable || item.ownerId === user?.uid}
-            style={styles.rentButton}
-          />
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <Button
+              title="Request Rental"
+              onPress={handleRentRequest}
+              disabled={!item.availability.isAvailable || item.ownerId === user?.uid}
+              style={{ minWidth: 140, marginRight: 32 }}
+            />
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -925,12 +928,12 @@ const styles = StyleSheet.create({
   bottomBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    paddingBottom: 34,
+    padding: 12,
+    paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
-    gap: 16,
+    gap: 12,
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -938,6 +941,7 @@ const styles = StyleSheet.create({
   },
   priceInfo: {
     flex: 1,
+    flexDirection: 'column',
   },
   bottomPrice: {
     fontSize: 20,
@@ -950,6 +954,7 @@ const styles = StyleSheet.create({
   },
   rentButton: {
     minWidth: 140,
+    marginRight: 12,
   },
   scrollContent: {
     paddingBottom: 100,
