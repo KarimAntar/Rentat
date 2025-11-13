@@ -469,13 +469,24 @@ const ItemDetailScreen: React.FC = () => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Owner</Text>
               <View style={styles.ownerInfo}>
-                <View style={styles.ownerAvatar}>
-                  <Ionicons name="person" size={24} color="#6B7280" />
-                </View>
+                <Image
+                  source={{
+                    uri: owner?.photoURL || 'https://via.placeholder.com/48x48?text=U',
+                  }}
+                  style={styles.ownerAvatar}
+                />
                 <View style={styles.ownerDetails}>
-                  <Text style={styles.ownerName}>
-                    {owner?.displayName || (owner?.email ? owner.email.split('@')[0] : 'Owner')}
-                  </Text>
+                  <View style={styles.ownerNameRow}>
+                    <Text style={styles.ownerName}>
+                      {owner?.displayName || (owner?.email ? owner.email.split('@')[0] : 'Owner')}
+                    </Text>
+                    {owner?.verification?.isVerified && (
+                      <View style={styles.verificationBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Text style={styles.verificationText}>Verified</Text>
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.ownerStats}>
                     <Ionicons name="star" size={14} color="#FFC107" />
                     <Text style={styles.rating}>
@@ -838,10 +849,25 @@ const styles = StyleSheet.create({
   ownerDetails: {
     flex: 1,
   },
+  ownerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   ownerName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
+  },
+  verificationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  verificationText: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '500',
   },
   ownerStats: {
     flexDirection: 'row',

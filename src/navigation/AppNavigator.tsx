@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Dimensions, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, Dimensions, StyleSheet, TouchableOpacity } from 'react-native';
 import { NavigationContainer, LinkingOptions, CommonActions } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthContext } from '../contexts/AuthContext';
 import { db, collections } from '../config/firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import UserGreeting from '../components/UserGreeting';
 
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -210,22 +211,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
 
 // Global Header Component
 const GlobalHeader: React.FC<{ title?: string; navigation?: any }> = ({ title, navigation }) => {
-  const { user, signOut } = useAuthContext();
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
-
-  const getDisplayName = () => {
-    if (user?.displayName) {
-      // Return only the first name (before the first space)
-      return user.displayName.split(' ')[0];
-    }
-    return 'Visitor';
-  };
+  const { signOut } = useAuthContext();
 
   const handleSignOut = async () => {
     try {
@@ -242,23 +228,7 @@ const GlobalHeader: React.FC<{ title?: string; navigation?: any }> = ({ title, n
   return (
     <View style={styles.globalHeader}>
       <View style={styles.greetingSection}>
-        <View style={styles.greetingWithAvatar}>
-          {user?.photoURL ? (
-            <Image source={{ uri: user.photoURL }} style={styles.userAvatar} />
-          ) : (
-            <View style={styles.userAvatar}>
-              <Ionicons name="person" size={20} color="#6B7280" />
-            </View>
-          )}
-          <View style={styles.greetingTextContainer}>
-            <Text style={styles.greetingText}>
-              {getGreeting()}
-            </Text>
-            <Text style={styles.greetingName}>
-              {getDisplayName()} 👋
-            </Text>
-          </View>
-        </View>
+        <UserGreeting avatarSize={48} />
       </View>
       <View style={styles.headerActions}>
         <TouchableOpacity style={styles.actionButton}>
@@ -507,6 +477,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  avatarContainer: {
+    position: 'relative',
+  },
   userAvatar: {
     width: 40,
     height: 40,
@@ -514,6 +487,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  verifiedAvatar: {
+    borderWidth: 2,
+    borderColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  verificationBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#10B981',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   greetingTextContainer: {
     flex: 1,
@@ -530,6 +525,18 @@ const styles = StyleSheet.create({
     color: '#4639eb',
     marginTop: 4,
     textAlign: 'left',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  kycVerifiedBadge: {
+    marginLeft: 4,
+  },
+  greetingEmoji: {
+    marginLeft: 4,
   },
   headerActions: {
     flexDirection: 'row',

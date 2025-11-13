@@ -314,6 +314,13 @@ const MessagesScreen: React.FC = () => {
           )}
         </View>
 
+        {chat.otherUser?.verification?.isVerified && (
+          <View style={styles.verificationBadge}>
+            <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+            <Text style={styles.verificationText}>Verified</Text>
+          </View>
+        )}
+
         {chat.item && (
           <View style={styles.itemInfo}>
             <Ionicons name="pricetag-outline" size={12} color="#6B7280" />
@@ -536,6 +543,17 @@ const styles = StyleSheet.create({
   },
   messageStatus: {
     marginLeft: 4,
+  },
+  verificationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  verificationText: {
+    fontSize: 10,
+    color: '#10B981',
+    fontWeight: '500',
   },
   doubleCheckContainer: {
     flexDirection: 'row',

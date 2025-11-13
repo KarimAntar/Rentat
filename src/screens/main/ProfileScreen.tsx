@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +15,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { CommonActions } from '@react-navigation/native';
 import { RootStackParamList } from '../../types';
 import { useAuthContext } from '../../contexts/AuthContext';
+import { useModal } from '../../contexts/ModalContext';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 import Button from '../../components/ui/Button';
@@ -41,6 +41,7 @@ interface TierInfo {
 const ProfileScreen: React.FC = () => {
   const { user, signOut } = useAuthContext();
   const navigation = useNavigation<NavigationProp>();
+  const { showModal } = useModal();
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
@@ -180,11 +181,12 @@ const ProfileScreen: React.FC = () => {
       const errorMessage = error.message || 'Unknown error';
 
       if (errorMessage === 'KYC_REQUIRED') {
-        Alert.alert(
-          'Verification Required',
-          'You need to complete identity verification before you can withdraw funds. This helps keep our community safe and secure.',
-          [
-            { text: 'Cancel', style: 'cancel' },
+        showModal({
+          title: 'Verification Required',
+          message: 'You need to complete identity verification before you can withdraw funds. This helps keep our community safe and secure.',
+          type: 'warning',
+          buttons: [
+            { text: 'Cancel', onPress: () => {}, style: 'cancel' },
             {
               text: 'Verify Now',
               onPress: () => {
@@ -192,31 +194,36 @@ const ProfileScreen: React.FC = () => {
                 if (parentNavigation) {
                   parentNavigation.navigate('KYCVerification');
                 }
-              }
+              },
+              style: 'default'
             }
           ]
-        );
+        });
       } else if (errorMessage === 'KYC_IN_PROGRESS') {
-        Alert.alert(
-          'Verification In Progress',
-          'Your identity verification is currently in progress. Please wait for it to be completed before withdrawing funds.'
-        );
+        showModal({
+          title: 'Verification In Progress',
+          message: 'Your identity verification is currently in progress. Please wait for it to be completed before withdrawing funds.',
+          type: 'info'
+        });
       } else if (errorMessage === 'KYC_IN_REVIEW') {
-        Alert.alert(
-          'Verification Under Review',
-          'Your identity verification is under review. We will notify you once it has been completed.'
-        );
+        showModal({
+          title: 'Verification Under Review',
+          message: 'Your identity verification is under review. We will notify you once it has been completed.',
+          type: 'info'
+        });
       } else if (errorMessage === 'KYC_REJECTED') {
-        Alert.alert(
-          'Verification Rejected',
-          'Your identity verification was rejected. Please contact support for more information.'
-        );
+        showModal({
+          title: 'Verification Rejected',
+          message: 'Your identity verification was rejected. Please contact support for more information.',
+          type: 'error'
+        });
       } else if (errorMessage === 'KYC_EXPIRED') {
-        Alert.alert(
-          'Verification Expired',
-          'Your identity verification has expired. Please complete the verification process again.',
-          [
-            { text: 'Cancel', style: 'cancel' },
+        showModal({
+          title: 'Verification Expired',
+          message: 'Your identity verification has expired. Please complete the verification process again.',
+          type: 'warning',
+          buttons: [
+            { text: 'Cancel', onPress: () => {}, style: 'cancel' },
             {
               text: 'Verify Again',
               onPress: () => {
@@ -224,12 +231,17 @@ const ProfileScreen: React.FC = () => {
                 if (parentNavigation) {
                   parentNavigation.navigate('KYCVerification');
                 }
-              }
+              },
+              style: 'default'
             }
           ]
-        );
+        });
       } else {
-        Alert.alert('Error', 'Failed to process withdrawal. Please try again.');
+        showModal({
+          title: 'Error',
+          message: 'Failed to process withdrawal. Please try again.',
+          type: 'error'
+        });
       }
     }
   };
@@ -249,7 +261,15 @@ const ProfileScreen: React.FC = () => {
               <Ionicons name="person" size={40} color="#6B7280" />
             </View>
           )}
-          <Text style={styles.name}>Welcome, {displayName}!</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name}>Welcome, {displayName}!</Text>
+            {isVerified && (
+              <View style={styles.kycVerifiedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                <Text style={styles.kycVerifiedText}>Verified</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.email}>{email}</Text>
           {user && !user.emailVerified && (
             <View style={styles.verificationBadge}>
@@ -545,11 +565,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 4,
+  },
+  kycVerifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  kycVerifiedText: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '500',
   },
   email: {
     fontSize: 16,

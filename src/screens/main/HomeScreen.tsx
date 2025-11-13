@@ -25,28 +25,14 @@ import { useAuthContext } from '../../contexts/AuthContext';
 import { useFeaturedItems, useItems } from '../../hooks/useFirestore';
 import { Item } from '../../types';
 import { getGovernorateById } from '../../data/governorates';
+import UserGreeting from '../../components/UserGreeting';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { user, signOut } = useAuthContext();
+  const { signOut } = useAuthContext();
   const { data: featuredItems, loading: featuredLoading, error: featuredError } = useFeaturedItems();
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
-
-  const getDisplayName = () => {
-    if (user?.displayName) {
-      // Return only the first name (before the first space)
-      return user.displayName.split(' ')[0];
-    }
-    return 'Visitor';
-  };
 
   const handleItemPress = (itemId: string) => {
     navigation.navigate('ItemDetails', { itemId });
@@ -104,12 +90,7 @@ const HomeScreen: React.FC = () => {
         {/* Greeting Header - Simple Header Style */}
         <View style={styles.greetingHeader}>
           <View style={styles.greetingSection}>
-            <Text style={styles.greetingText}>
-              {getGreeting()}
-            </Text>
-            <Text style={styles.greetingName}>
-              {getDisplayName()} 👋
-            </Text>
+            <UserGreeting avatarSize={56} />
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.actionButton}>
@@ -295,6 +276,59 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     marginBottom: 20,
+  },
+  greetingWithAvatar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verifiedAvatar: {
+    borderWidth: 2,
+    borderColor: '#10B981',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  verificationBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#10B981',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  greetingTextContainer: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  kycVerifiedBadge: {
+    marginLeft: 4,
+  },
+  greetingEmoji: {
+    marginLeft: 4,
   },
   headerActions: {
     flexDirection: 'row',

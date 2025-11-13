@@ -504,8 +504,8 @@ const ChatScreen: React.FC = () => {
                     // Check message status for delivery/read indicators
                     const messageStatus = message.status;
 
-                    // If message has been read by recipient
-                    if (messageStatus?.read) {
+                    // If message has been read by recipient (check both message status and chat read status)
+                    if (messageStatus?.read || (chat && chat.metadata?.unreadCount?.[otherUserId || ''] === 0)) {
                       return <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" />;
                     }
                     // If message has been delivered but not read
