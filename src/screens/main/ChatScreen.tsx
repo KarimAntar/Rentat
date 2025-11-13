@@ -506,19 +506,19 @@ const ChatScreen: React.FC = () => {
 
                     // If message has been read by recipient
                     if (messageStatus?.read) {
-                      return <Ionicons name="checkmark-done-outline" size={16} color="#4639eb" />;
+                      return <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" />;
                     }
                     // If message has been delivered but not read
                     else if (messageStatus?.delivered) {
-                      return <Ionicons name="checkmark-done-outline" size={16} color="#6B7280" />;
+                      return <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" />;
                     }
                     // If message was sent but not delivered
                     else if (messageStatus?.sent) {
-                      return <Ionicons name="checkmark-outline" size={16} color="#6B7280" />;
+                      return <Ionicons name="checkmark-outline" size={16} color="#FFFFFF" />;
                     }
                     // Default: single checkmark for sent
                     else {
-                      return <Ionicons name="checkmark-outline" size={16} color="#6B7280" />;
+                      return <Ionicons name="checkmark-outline" size={16} color="#FFFFFF" />;
                     }
                   })()}
                 </View>
