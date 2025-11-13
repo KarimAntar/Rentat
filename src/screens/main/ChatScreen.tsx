@@ -501,13 +501,23 @@ const ChatScreen: React.FC = () => {
               {isMyMessage && (
                 <View style={styles.messageStatus}>
                   {(() => {
-                    // WhatsApp-style: check if this message was read by the other participant (permanent)
-                    const otherUserId = chat?.participants.find(p => p !== user?.uid);
-                    const isRead = chat?.metadata?.unreadCount?.[otherUserId || ''] === 0;
+                    // Check message status for delivery/read indicators
+                    const messageStatus = message.status;
 
-                    if (isRead) {
+                    // If message has been read by recipient
+                    if (messageStatus?.read) {
                       return <Ionicons name="checkmark-done-outline" size={16} color="#4639eb" />;
-                    } else {
+                    }
+                    // If message has been delivered but not read
+                    else if (messageStatus?.delivered) {
+                      return <Ionicons name="checkmark-done-outline" size={16} color="#6B7280" />;
+                    }
+                    // If message was sent but not delivered
+                    else if (messageStatus?.sent) {
+                      return <Ionicons name="checkmark-outline" size={16} color="#6B7280" />;
+                    }
+                    // Default: single checkmark for sent
+                    else {
                       return <Ionicons name="checkmark-outline" size={16} color="#6B7280" />;
                     }
                   })()}
@@ -532,58 +542,59 @@ const ChatScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#111827" />
-          </TouchableOpacity>
+      {/* Header - Fixed */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#111827" />
+        </TouchableOpacity>
 
-          <View style={styles.headerInfo}>
-            <Image
-              source={{
-                uri: otherUser?.photoURL || 'https://via.placeholder.com/40x40?text=U',
-              }}
-              style={styles.headerAvatar}
-            />
-            <View style={styles.headerText}>
-              <Text style={styles.headerName}>
-                {otherUser?.displayName || 'User'}
-              </Text>
-              <View style={styles.headerSubtitle}>
-                {chat?.id.startsWith('mock-chat-') ? (
-                  <View style={styles.tempModeBadge}>
-                    <Ionicons name="construct" size={12} color="#F59E0B" />
-                    <Text style={styles.tempModeText}>Testing Mode</Text>
-                  </View>
-                ) : (
-                  <View style={styles.realModeBadge}>
-                    <Ionicons name="chatbubble" size={12} color="#10B981" />
-                    <Text style={styles.realModeText}>Live Chat</Text>
-                  </View>
-                )}
-                {otherUser?.verification.isVerified && (
-                  <View style={styles.verificationBadge}>
-                    <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                    <Text style={styles.verificationText}>Verified</Text>
-                  </View>
-                )}
-              </View>
+        <View style={styles.headerInfo}>
+          <Image
+            source={{
+              uri: otherUser?.photoURL || 'https://via.placeholder.com/40x40?text=U',
+            }}
+            style={styles.headerAvatar}
+          />
+          <View style={styles.headerText}>
+            <Text style={styles.headerName}>
+              {otherUser?.displayName || 'User'}
+            </Text>
+            <View style={styles.headerSubtitle}>
+              {chat?.id.startsWith('mock-chat-') ? (
+                <View style={styles.tempModeBadge}>
+                  <Ionicons name="construct" size={12} color="#F59E0B" />
+                  <Text style={styles.tempModeText}>Testing Mode</Text>
+                </View>
+              ) : (
+                <View style={styles.realModeBadge}>
+                  <Ionicons name="chatbubble" size={12} color="#10B981" />
+                  <Text style={styles.realModeText}>Live Chat</Text>
+                </View>
+              )}
+              {otherUser?.verification.isVerified && (
+                <View style={styles.verificationBadge}>
+                  <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                  <Text style={styles.verificationText}>Verified</Text>
+                </View>
+              )}
             </View>
           </View>
-
-          <TouchableOpacity style={styles.callButton}>
-            <Ionicons name="call-outline" size={20} color="#4639eb" />
-          </TouchableOpacity>
         </View>
 
-        {/* Messages */}
+        <TouchableOpacity style={styles.callButton}>
+          <Ionicons name="call-outline" size={20} color="#4639eb" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Messages - Scrollable */}
+      <KeyboardAvoidingView
+        style={styles.messagesArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
         <FlatList
           ref={flatListRef}
           data={messages}
@@ -608,52 +619,52 @@ const ChatScreen: React.FC = () => {
             </Text>
           </View>
         )}
-
-        {/* Input */}
-        <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.attachButton}>
-            <Ionicons name="camera-outline" size={24} color="#6B7280" />
-          </TouchableOpacity>
-
-          <TextInput
-            style={styles.messageInput}
-            placeholder="Type a message..."
-            value={messageText}
-            onChangeText={setMessageText}
-            multiline
-            maxLength={1000}
-            onKeyPress={(e) => {
-              if (e.nativeEvent.key === 'Enter') {
-                // @ts-ignore - shiftKey exists in native event but not in types
-                if (e.nativeEvent.shiftKey) {
-                  // Shift+Enter: Allow default behavior (new line)
-                  return;
-                } else {
-                  // Enter: Send message and prevent default
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }
-            }}
-            blurOnSubmit={false}
-          />
-
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (messageText.trim().length > 0 && !sending) && styles.sendButtonActive,
-            ]}
-            onPress={sendMessage}
-            disabled={!messageText.trim() || sending}
-          >
-            <Ionicons
-              name={sending ? "hourglass-outline" : "send"}
-              size={20}
-              color={messageText.trim().length > 0 ? "#FFFFFF" : "#9CA3AF"}
-            />
-          </TouchableOpacity>
-        </View>
       </KeyboardAvoidingView>
+
+      {/* Input - Fixed */}
+      <View style={styles.inputContainer}>
+        <TouchableOpacity style={styles.attachButton}>
+          <Ionicons name="camera-outline" size={24} color="#6B7280" />
+        </TouchableOpacity>
+
+        <TextInput
+          style={styles.messageInput}
+          placeholder="Type a message..."
+          value={messageText}
+          onChangeText={setMessageText}
+          multiline
+          maxLength={1000}
+          onKeyPress={(e) => {
+            if (e.nativeEvent.key === 'Enter') {
+              // @ts-ignore - shiftKey exists in native event but not in types
+              if (e.nativeEvent.shiftKey) {
+                // Shift+Enter: Allow default behavior (new line)
+                return;
+              } else {
+                // Enter: Send message and prevent default
+                e.preventDefault();
+                sendMessage();
+              }
+            }
+          }}
+          blurOnSubmit={false}
+        />
+
+        <TouchableOpacity
+          style={[
+            styles.sendButton,
+            (messageText.trim().length > 0 && !sending) && styles.sendButtonActive,
+          ]}
+          onPress={sendMessage}
+          disabled={!messageText.trim() || sending}
+        >
+          <Ionicons
+            name={sending ? "hourglass-outline" : "send"}
+            size={20}
+            color={messageText.trim().length > 0 ? "#FFFFFF" : "#9CA3AF"}
+          />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -752,6 +763,9 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: '#F0F9FF',
+  },
+  messagesArea: {
+    flex: 1,
   },
   messagesList: {
     flex: 1,

@@ -286,10 +286,10 @@ const MessagesScreen: React.FC = () => {
         </View>
 
         <View style={styles.chatMessage}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {chat.lastMessage.text || 'No messages yet'}
-          </Text>
-          <View style={styles.messageStatusContainer}>
+          <View style={styles.messageContent}>
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {chat.lastMessage.text || 'No messages yet'}
+            </Text>
             {chat.lastMessage.senderId === user?.uid && (
               <View style={styles.messageStatus}>
                 {(() => {
@@ -301,17 +301,17 @@ const MessagesScreen: React.FC = () => {
                     chat.metadata?.unreadCount?.[otherUserId || ''] === 0;
 
                   if (lastMsgRead) {
-                    return <Ionicons name="checkmark-done-outline" size={16} color="#4639eb" />;
+                    return <Ionicons name="checkmark-done-outline" size={14} color="#4639eb" />;
                   } else {
-                    return <Ionicons name="checkmark-outline" size={16} color="#6B7280" />;
+                    return <Ionicons name="checkmark-outline" size={14} color="#6B7280" />;
                   }
                 })()}
               </View>
             )}
-            {chat.unreadCount > 0 && (
-              <View style={styles.unreadIndicator} />
-            )}
           </View>
+          {chat.unreadCount > 0 && (
+            <View style={styles.unreadIndicator} />
+          )}
         </View>
 
         {chat.item && (
@@ -500,6 +500,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  messageContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   lastMessage: {
     fontSize: 14,
