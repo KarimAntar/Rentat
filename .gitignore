@@ -60,4 +60,7 @@ src/config/private/
 /ios
 /android
 
+# Documentation (may contain sensitive information)
+docs/
+
 firebase-debug.log

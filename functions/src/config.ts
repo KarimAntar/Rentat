@@ -53,9 +53,9 @@ export const config = {
     webhookSecret: (process.env as any).STRIPE_WEBHOOK_SECRET || '',
   },
   didit: {
-    apiKey: 'arUslI6-aKMrMXKtExrHRbJiz-M4c4UcG8qK_EiIV9w',
-    workflowId: '09461199-947d-4606-99c1-fffa7fd91efc',
-    webhookSecret: '8TZs7WgdreX9ByygbyXEfhOA25FPZsnm7f_jURLStKY',
-    webhookUrl: 'https://webhooks-tfsivlyrrq-uc.a.run.app/didit-webhook',
+    apiKey: (process.env as any).DIDIT_API_KEY || '',
+    workflowId: (process.env as any).DIDIT_WORKFLOW_ID || '',
+    webhookSecret: (process.env as any).DIDIT_WEBHOOK_SECRET || '',
+    webhookUrl: (process.env as any).DIDIT_WEBHOOK_URL || '',
   },
 };
