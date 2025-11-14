@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Dimensions, StyleSheet, TouchableOpacity } from 'react-native';
-import { NavigationContainer, LinkingOptions, CommonActions } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions, CommonActions, useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -83,7 +83,7 @@ const AuthNavigator: React.FC = () => {
   );
 };
 
-// Custom Tab Bar Component - Always shows text below icons
+// Custom Tab Bar Component - Shows different tabs based on auth status
 const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
   const { user } = useAuthContext();
   const [unreadCount, setUnreadCount] = React.useState(0);
@@ -111,34 +111,50 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
     return unsubscribe;
   }, [user]);
 
+  // Define tabs based on authentication status
+  const getTabs = () => {
+    if (!user) {
+      // Visitor tabs: Home | Search | Sign in
+      return [
+        { name: 'Home', label: 'Home', icon: 'home' },
+        { name: 'Search', label: 'Search', icon: 'search' },
+        { name: 'SignIn', label: 'Sign in', icon: 'log-in' }
+      ];
+    } else {
+      // Authenticated user tabs: Home | Search | Add Item | Messages | Account
+      return [
+        { name: 'Home', label: 'Home', icon: 'home' },
+        { name: 'Search', label: 'Search', icon: 'search' },
+        { name: 'AddItem', label: 'Add Item', icon: 'add-circle' },
+        { name: 'Messages', label: 'Messages', icon: 'chatbubble' },
+        { name: 'Account', label: 'Account', icon: 'person' }
+      ];
+    }
+  };
+
+  const tabs = getTabs();
+
   return (
     <View style={styles.tabBarContainer}>
-      {state.routes.map((route: any, index: number) => {
-        const { options } = descriptors[route.key];
-        const label =
-          options.tabBarLabel !== undefined
-            ? options.tabBarLabel
-            : options.title !== undefined
-            ? options.title
-            : route.name;
+      {tabs.map((tab, index) => {
+        const route = state.routes.find((r: any) => r.name === tab.name);
+        const isSignInTab = tab.name === 'SignIn';
 
+        // For SignIn tab, we don't need a route since it's just an action
+        if (!route && !isSignInTab) return null;
+
+        const { options } = route ? descriptors[route.key] : {};
         const isFocused = state.index === index;
 
-        let iconName: keyof typeof Ionicons.glyphMap = 'help-outline';
-
-        if (route.name === 'Home') {
-          iconName = isFocused ? 'home' : 'home-outline';
-        } else if (route.name === 'Search') {
-          iconName = isFocused ? 'search' : 'search-outline';
-        } else if (route.name === 'AddItem') {
-          iconName = isFocused ? 'add-circle' : 'add-circle-outline';
-        } else if (route.name === 'Messages') {
-          iconName = isFocused ? 'chatbubble' : 'chatbubble-outline';
-        } else if (route.name === 'Account') {
-          iconName = isFocused ? 'person' : 'person-outline';
-        }
+        let iconName: keyof typeof Ionicons.glyphMap = tab.icon as any;
 
         const onPress = () => {
+          if (isSignInTab) {
+            // Navigate to auth stack for sign in
+            navigation.navigate('Auth', { screen: 'Login' });
+            return;
+          }
+
           const event = navigation.emit({
             type: 'tabPress',
             target: route.key,
@@ -146,8 +162,14 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
           });
 
           if (!isFocused && !event.defaultPrevented) {
+            if (tab.name === 'Account' && !user) {
+              // Redirect to login if trying to access account while not logged in
+              navigation.navigate('Auth', { screen: 'Login' });
+              return;
+            }
+
             // Check if user needs to be authenticated for this tab
-            const requiresAuth = ['AddItem', 'Messages', 'Profile'].includes(route.name);
+            const requiresAuth = ['AddItem', 'Messages', 'Profile'].includes(tab.name);
 
             if (requiresAuth && !user) {
               // Navigate to auth stack instead of the protected tab
@@ -155,35 +177,37 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
               return;
             }
 
-            navigation.navigate(route.name);
+            navigation.navigate(tab.name);
           }
         };
 
         const onLongPress = () => {
-          navigation.emit({
-            type: 'tabLongPress',
-            target: route.key,
-          });
+          if (route) {
+            navigation.emit({
+              type: 'tabLongPress',
+              target: route.key,
+            });
+          }
         };
 
         return (
           <TouchableOpacity
-            key={route.key}
+            key={tab.name}
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={options.tabBarAccessibilityLabel}
-            testID={options.tabBarTestID}
+            accessibilityLabel={options?.tabBarAccessibilityLabel}
+            testID={options?.tabBarTestID}
             onPress={onPress}
             onLongPress={onLongPress}
             style={styles.tabBarItem}
           >
             <View style={styles.iconContainer}>
               <Ionicons
-                name={iconName}
+                name={isFocused ? iconName : `${iconName}-outline` as any}
                 size={isFocused ? 24 : 22}
                 color={isFocused ? '#4639eb' : '#6B7280'}
               />
-              {route.name === 'Messages' && unreadCount > 0 && (
+              {tab.name === 'Messages' && unreadCount > 0 && (
                 <View style={styles.unreadBadge}>
                   <Text style={styles.unreadBadgeText}>
                     {unreadCount > 99 ? '99+' : unreadCount.toString()}
@@ -200,7 +224,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                 },
               ]}
             >
-              {typeof label === 'string' ? label : label({ focused: isFocused, color: '' })}
+              {tab.label}
             </Text>
           </TouchableOpacity>
         );

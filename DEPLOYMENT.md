@@ -45,8 +45,8 @@ Vercel now includes caching optimizations for faster rebuilds.
 
 #### Optimizations Applied
 - ✅ Build caching enabled
-- ✅ Static asset caching (1 year)
-- ✅ Optimized headers for JS/CSS/images
+- ✅ Basic static asset caching
+- 📝 Advanced caching headers removed (can be added back if needed)
 
 #### Deploy
 ```bash
