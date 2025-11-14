@@ -590,11 +590,11 @@ const ChatScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Messages - Scrollable */}
+      {/* Messages and Input - Keyboard Avoiding */}
       <KeyboardAvoidingView
-        style={styles.messagesArea}
+        style={styles.contentArea}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <FlatList
           ref={flatListRef}
@@ -620,52 +620,52 @@ const ChatScreen: React.FC = () => {
             </Text>
           </View>
         )}
-      </KeyboardAvoidingView>
 
-      {/* Input - Fixed */}
-      <View style={styles.inputContainer}>
-        <TouchableOpacity style={styles.attachButton}>
-          <Ionicons name="camera-outline" size={24} color="#6B7280" />
-        </TouchableOpacity>
+        {/* Input - Fixed at bottom */}
+        <View style={styles.inputContainer}>
+          <TouchableOpacity style={styles.attachButton}>
+            <Ionicons name="camera-outline" size={24} color="#6B7280" />
+          </TouchableOpacity>
 
-        <TextInput
-          style={styles.messageInput}
-          placeholder="Type a message..."
-          value={messageText}
-          onChangeText={setMessageText}
-          multiline
-          maxLength={1000}
-          onKeyPress={(e) => {
-            if (e.nativeEvent.key === 'Enter') {
-              // @ts-ignore - shiftKey exists in native event but not in types
-              if (e.nativeEvent.shiftKey) {
-                // Shift+Enter: Allow default behavior (new line)
-                return;
-              } else {
-                // Enter: Send message and prevent default
-                e.preventDefault();
-                sendMessage();
+          <TextInput
+            style={styles.messageInput}
+            placeholder="Type a message..."
+            value={messageText}
+            onChangeText={setMessageText}
+            multiline
+            maxLength={1000}
+            onKeyPress={(e) => {
+              if (e.nativeEvent.key === 'Enter') {
+                // @ts-ignore - shiftKey exists in native event but not in types
+                if (e.nativeEvent.shiftKey) {
+                  // Shift+Enter: Allow default behavior (new line)
+                  return;
+                } else {
+                  // Enter: Send message and prevent default
+                  e.preventDefault();
+                  sendMessage();
+                }
               }
-            }
-          }}
-          blurOnSubmit={false}
-        />
-
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            (messageText.trim().length > 0 && !sending) && styles.sendButtonActive,
-          ]}
-          onPress={sendMessage}
-          disabled={!messageText.trim() || sending}
-        >
-          <Ionicons
-            name={sending ? "hourglass-outline" : "send"}
-            size={20}
-            color={messageText.trim().length > 0 ? "#FFFFFF" : "#9CA3AF"}
+            }}
+            blurOnSubmit={false}
           />
-        </TouchableOpacity>
-      </View>
+
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (messageText.trim().length > 0 && !sending) && styles.sendButtonActive,
+            ]}
+            onPress={sendMessage}
+            disabled={!messageText.trim() || sending}
+          >
+            <Ionicons
+              name={sending ? "hourglass-outline" : "send"}
+              size={20}
+              color={messageText.trim().length > 0 ? "#FFFFFF" : "#9CA3AF"}
+            />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -764,6 +764,9 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: '#F0F9FF',
+  },
+  contentArea: {
+    flex: 1,
   },
   messagesArea: {
     flex: 1,
