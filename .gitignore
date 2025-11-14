@@ -64,3 +64,5 @@ src/config/private/
 docs/
 
 firebase-debug.log
+
+.vercel

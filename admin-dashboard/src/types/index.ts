@@ -330,7 +330,6 @@ export interface PaginatedResponse<T> {
 
 // Import types from main app (these will be shared)
 export type {
-  User,
   Item,
   Rental,
   Review,
@@ -343,3 +342,16 @@ export type {
   PaymentStatus,
   ItemCondition,
 } from '../../../src/types/index';
+
+// Import base User type and extend it with admin-specific fields
+import { User as BaseUser } from '../../../src/types/index';
+
+// Extended User type with admin-specific fields
+export interface User extends Omit<BaseUser, 'uid'> {
+  id: string; // For DataGrid compatibility
+  uid: string;
+  phoneNumber?: string; // Alias for phone
+  isBanned?: boolean; // Admin field
+  verificationStatus?: string; // Flattened from verification.verificationStatus
+  governorate?: string; // Flattened from location.city
+}

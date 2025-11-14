@@ -43,6 +43,16 @@ const HomeScreen: React.FC = () => {
     navigation.navigate('Search' as never);
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Navigate to Auth stack after sign out
+      navigation.navigate('Auth' as never);
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   const renderFeaturedItem = ({ item }: { item: Item }) => (
     <TouchableOpacity style={styles.featuredCard} onPress={() => handleItemPress(item.id)}>
       <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300x200?text=No+Image' }} style={styles.featuredImage} />
@@ -96,7 +106,7 @@ const HomeScreen: React.FC = () => {
             <TouchableOpacity style={styles.actionButton}>
               <Ionicons name="notifications-outline" size={24} color="#6B7280" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => signOut()} style={styles.actionButton}>
+            <TouchableOpacity onPress={() => handleSignOut()} style={styles.actionButton}>
               <Ionicons name="log-out-outline" size={24} color="#6B7280" />
             </TouchableOpacity>
           </View>

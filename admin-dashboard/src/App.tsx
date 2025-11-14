@@ -1,76 +1,146 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import { Box, Container, Typography, Paper } from '@mui/material';
+import { CssBaseline, Box, CircularProgress } from '@mui/material';
 import theme from './theme';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { DashboardLayout } from './components/layout/DashboardLayout';
+import { LoginPage } from './pages/LoginPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { UsersPage } from './pages/UsersPage';
+import { ItemsPage } from './pages/ItemsPage';
+
+// Protected Route wrapper
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser, adminUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!currentUser || !adminUser) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Public Route wrapper (redirects to dashboard if already logged in)
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser, adminUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (currentUser && adminUser) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+function AppContent() {
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <LoginPage />
+          </PublicRoute>
+        }
+      />
+
+      {/* Protected Routes */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <DashboardPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* User Management */}
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <UsersPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Items Management */}
+      <Route
+        path="/items"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <ItemsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/rentals"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <Box sx={{ p: 3 }}>
+                <h2>Rentals Management</h2>
+                <p>Coming soon...</p>
+              </Box>
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Default redirect */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        }}
-      >
-        <Container maxWidth="md">
-          <Paper
-            elevation={3}
-            sx={{
-              p: 6,
-              textAlign: 'center',
-              borderRadius: 4,
-            }}
-          >
-            <Typography variant="h2" gutterBottom color="primary">
-              🏠 Rentat Admin Dashboard
-            </Typography>
-            <Typography variant="h5" color="text.secondary" sx={{ mb: 4 }}>
-              Rental Marketplace Management Platform
-            </Typography>
-            
-            <Box sx={{ mt: 4, textAlign: 'left' }}>
-              <Typography variant="h6" gutterBottom>
-                ✅ Foundation Complete!
-              </Typography>
-              <Typography variant="body1" paragraph>
-                The admin dashboard foundation has been successfully set up with:
-              </Typography>
-              <ul style={{ lineHeight: 2 }}>
-                <li>React 18 + TypeScript + Vite</li>
-                <li>Material-UI (MUI) v5+</li>
-                <li>Firebase configuration</li>
-                <li>Comprehensive type definitions</li>
-                <li>Theme configuration (light/dark mode)</li>
-                <li>Project structure for all features</li>
-              </ul>
-              
-              <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
-                📋 Next Steps:
-              </Typography>
-              <Typography variant="body2" paragraph>
-                Check the README.md for the complete implementation roadmap. The foundation includes:
-              </Typography>
-              <ul style={{ lineHeight: 1.8, fontSize: '0.9rem' }}>
-                <li>Authentication system setup</li>
-                <li>Dashboard layout components</li>
-                <li>User management features</li>
-                <li>Content moderation tools</li>
-                <li>Analytics dashboard</li>
-                <li>Notification system</li>
-                <li>Feature flags management</li>
-              </ul>
-            </Box>
-
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-              Created for Rentat - Your trusted rental marketplace
-            </Typography>
-          </Paper>
-        </Container>
-      </Box>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

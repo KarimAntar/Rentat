@@ -216,7 +216,7 @@ const GlobalHeader: React.FC<{ title?: string; navigation?: any }> = ({ title, n
   const handleSignOut = async () => {
     try {
       await signOut();
-      // Navigate to Auth stack after sign out (allows back navigation)
+      // Navigate to Auth stack after sign out
       if (navigation) {
         navigation.navigate('Auth');
       }

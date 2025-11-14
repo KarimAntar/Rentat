@@ -16,7 +16,7 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return request.auth.token.admin == true;
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
     
     function isParticipant(participants) {
@@ -336,13 +336,13 @@ service cloud.firestore {
 
     // Platform revenue collection
     match /platform_revenue/{revenueId} {
-      allow read: if request.auth.token.admin == true; // Only admins can view revenue data
+      allow read: if isAdmin(); // Only admins can view revenue data
 
-      allow create: if request.auth.token.admin == true; // Only system can create revenue records
+      allow create: if isAdmin(); // Only system can create revenue records
 
-      allow update: if request.auth.token.admin == true; // Only system can update revenue records
+      allow update: if isAdmin(); // Only system can update revenue records
 
-      allow delete: if request.auth.token.admin == true;
+      allow delete: if isAdmin();
     }
 
     // Platform costs collection
@@ -351,6 +351,14 @@ service cloud.firestore {
       allow create: if isAdmin(); // Only system can create cost records
       allow update: if isAdmin(); // Only system can update cost records
       allow delete: if isAdmin();
+    }
+
+    // Admins collection - for admin dashboard authentication
+    match /admins/{adminId} {
+      // Allow authenticated users to read their own admin document
+      allow read: if isAuthenticated() && isOwner(adminId);
+      // Only allow creation/updates through backend (Firebase Admin SDK)
+      allow write: if false;
     }
 
     // Admin logs collection
@@ -433,8 +441,8 @@ service firebase.storage {
     // Public assets (category icons, app assets)
     match /public/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null && 
-        request.auth.token.admin == true;
+      allow write: if request.auth != null &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
     
     // Deny all other access

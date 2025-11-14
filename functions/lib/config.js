@@ -87,10 +87,10 @@ exports.config = {
         webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
     },
     didit: {
-        apiKey: 'arUslI6-aKMrMXKtExrHRbJiz-M4c4UcG8qK_EiIV9w',
-        workflowId: '09461199-947d-4606-99c1-fffa7fd91efc',
-        webhookSecret: '8TZs7WgdreX9ByygbyXEfhOA25FPZsnm7f_jURLStKY',
-        webhookUrl: 'https://webhooks-tfsivlyrrq-uc.a.run.app/didit-webhook',
+        apiKey: process.env.DIDIT_API_KEY || '',
+        workflowId: process.env.DIDIT_WORKFLOW_ID || '',
+        webhookSecret: process.env.DIDIT_WEBHOOK_SECRET || '',
+        webhookUrl: process.env.DIDIT_WEBHOOK_URL || '',
     },
 };
 //# sourceMappingURL=config.js.map

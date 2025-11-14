@@ -23,9 +23,9 @@ export declare const config: {
         webhookSecret: any;
     };
     didit: {
-        apiKey: string;
-        workflowId: string;
-        webhookSecret: string;
-        webhookUrl: string;
+        apiKey: any;
+        workflowId: any;
+        webhookSecret: any;
+        webhookUrl: any;
     };
 };

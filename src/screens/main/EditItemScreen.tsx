@@ -35,6 +35,9 @@ interface EditableForm {
   description: string;
   category: string;
   condition: ItemCondition;
+  governorate: string;
+  address: string;
+  city: string;
   dailyRate: string;
   securityDeposit: string;
   minRentalDays: string;
@@ -46,7 +49,6 @@ interface EditableForm {
     delivery: boolean;
     meetInMiddle: boolean;
   };
-  cancellationPolicy: string;
 }
 
 const CONDITIONS: { value: ItemCondition; label: string }[] = [
@@ -93,6 +95,9 @@ const EditItemScreen: React.FC = (props: any) => {
         description: existing.description,
         category: existing.category,
         condition: existing.condition,
+        governorate: existing.governorate,
+        address: existing.location.address,
+        city: existing.location.city,
         dailyRate: existing.pricing.dailyRate.toString(),
         securityDeposit: existing.pricing.securityDeposit.toString(),
         minRentalDays: existing.availability.minRentalDays.toString(),
@@ -104,7 +109,6 @@ const EditItemScreen: React.FC = (props: any) => {
             delivery: existing.location.deliveryOptions.delivery,
             meetInMiddle: existing.location.deliveryOptions.meetInMiddle,
         },
-        cancellationPolicy: existing.policies.cancellationPolicy || 'flexible',
       });
     } catch (e) {
       Alert.alert('Error', 'Failed to load item');
@@ -199,6 +203,7 @@ const EditItemScreen: React.FC = (props: any) => {
         description: form.description.trim(),
         category: form.category,
         condition: form.condition,
+        governorate: form.governorate,
         images: finalImages,
         pricing: {
           ...item.pricing,
@@ -212,15 +217,13 @@ const EditItemScreen: React.FC = (props: any) => {
         },
         location: {
           ...item.location,
+          address: form.address,
+          city: form.city,
           deliveryOptions: {
             pickup: form.deliveryOptions.pickup,
             delivery: form.deliveryOptions.delivery,
             meetInMiddle: form.deliveryOptions.meetInMiddle,
           },
-        },
-        policies: {
-          ...item.policies,
-          cancellationPolicy: form.cancellationPolicy,
         },
       } as any);
 
@@ -453,13 +456,29 @@ const EditItemScreen: React.FC = (props: any) => {
             </TouchableOpacity>
           ))}
 
-          <Text style={styles.sectionTitle}>Policies</Text>
-          <Text style={styles.label}>Cancellation Policy</Text>
+          <Text style={styles.sectionTitle}>Location</Text>
+          <Text style={styles.label}>Governorate *</Text>
           <TextInput
             style={styles.input}
-            value={form.cancellationPolicy}
-            onChangeText={t => updateField('cancellationPolicy', t)}
-            placeholder="flexible / moderate / strict"
+            value={form.governorate}
+            onChangeText={t => updateField('governorate', t)}
+            placeholder="Select governorate"
+          />
+
+          <Text style={styles.label}>City *</Text>
+          <TextInput
+            style={styles.input}
+            value={form.city}
+            onChangeText={t => updateField('city', t)}
+            placeholder="Enter city"
+          />
+
+          <Text style={styles.label}>Address *</Text>
+          <TextInput
+            style={styles.input}
+            value={form.address}
+            onChangeText={t => updateField('address', t)}
+            placeholder="Enter detailed address"
           />
 
           <View style={{ height: 32 }} />
