@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -49,7 +49,7 @@ const ChatScreen: React.FC = () => {
   }, []);
 
   // Auto-scroll to bottom when messages are loaded or updated
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (messages.length > 0 && !loading) {
       const scrollToBottom = () => {
         if (Platform.OS === 'web') {
@@ -135,8 +135,21 @@ const ChatScreen: React.FC = () => {
       if (existingChat) {
         setChat(existingChat);
         const unsubscribe = ChatService.subscribeToMessages(existingChat.id, (msgs) => {
+          // Mark messages from other users as read locally when chat is opened
+          const updatedMsgs = msgs.map(m => {
+            if (m.senderId !== user.uid && !m.status?.read) {
+              return {
+                ...m,
+                status: {
+                  ...m.status,
+                  read: new Date(),
+                }
+              };
+            }
+            return m;
+          });
           setMessages(
-            msgs.map(m => ({
+            updatedMsgs.map(m => ({
               ...m,
               senderName: m.senderId === user.uid ? (user.displayName || 'You') : 'User',
               senderAvatar: (m.senderId === user.uid ? user.photoURL : undefined) || undefined,
