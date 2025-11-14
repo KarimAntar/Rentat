@@ -53,31 +53,33 @@ const ChatScreen: React.FC = () => {
     if (messages.length > 0 && !loading) {
       const scrollToBottom = () => {
         if (Platform.OS === 'web') {
-          // For web, directly manipulate the DOM
-          const scrollView = scrollViewRef.current as any;
-          if (scrollView && scrollView._nativeTag) {
-            const element = document.querySelector(`[data-focusable="true"]`);
-            if (element) {
-              element.scrollTop = element.scrollHeight;
-            }
-          }
-          // Also try accessing the scroll container directly
+          // For web, use a more reliable approach
           setTimeout(() => {
-            const scrollContainers = document.querySelectorAll('[style*="overflow"]');
-            scrollContainers.forEach(container => {
-              if (container.scrollHeight > container.clientHeight) {
-                container.scrollTop = container.scrollHeight;
-              }
-            });
-          }, 50);
+            const scrollView = scrollViewRef.current as any;
+            if (scrollView && scrollView.scrollToEnd) {
+              scrollView.scrollToEnd({ animated: false });
+            } else {
+              // Fallback: find scrollable containers
+              const scrollContainers = document.querySelectorAll('[style*="overflow"]');
+              scrollContainers.forEach(container => {
+                const element = container as HTMLElement;
+                if (element.scrollHeight > element.clientHeight) {
+                  element.scrollTop = element.scrollHeight;
+                }
+              });
+            }
+          }, 100);
         } else {
           // For native, use scrollToEnd
-          scrollViewRef.current?.scrollToEnd({ animated: false });
+          setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: false });
+          }, 100);
         }
       };
 
-      setTimeout(scrollToBottom, 100);
-      setTimeout(scrollToBottom, 300);
+      scrollToBottom();
+      // Additional attempts to ensure scrolling works
+      setTimeout(scrollToBottom, 200);
       setTimeout(scrollToBottom, 500);
     }
   }, [messages.length, loading]);
@@ -252,6 +254,17 @@ const ChatScreen: React.FC = () => {
       >
       {messages.map((msg, index) => {
         const isMyMessage = msg.senderId === user?.uid;
+        const getMessageStatus = () => {
+          if (!isMyMessage) return null;
+          if (msg.status?.read) return { icon: 'checkmark-done', color: '#4639eb', label: 'read' };
+          if (msg.status?.delivered) return { icon: 'checkmark-done', color: '#6B7280', label: 'delivered' };
+          if (msg.status?.sent) return { icon: 'checkmark', color: '#6B7280', label: 'sent' };
+          // For older messages without status, assume sent
+          return { icon: 'checkmark', color: '#6B7280', label: 'sent' };
+        };
+
+        const status = getMessageStatus();
+
         return (
           <View
             key={msg.id}
@@ -261,9 +274,21 @@ const ChatScreen: React.FC = () => {
               <Text style={[styles.messageText, isMyMessage ? styles.myText : styles.otherText]}>
                 {msg.content.text}
               </Text>
-              <Text style={[styles.messageTime, isMyMessage ? styles.myTime : styles.otherTime]}>
-                {formatTime(msg.timestamp)}
-              </Text>
+              <View style={styles.messageFooter}>
+                <Text style={[styles.messageTime, isMyMessage ? styles.myTime : styles.otherTime]}>
+                  {formatTime(msg.timestamp)}
+                </Text>
+                {status && (
+                  <View style={styles.statusContainer}>
+                    <Ionicons
+                      name={status.icon as any}
+                      size={14}
+                      color={status.color}
+                      style={styles.statusIcon}
+                    />
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         );
@@ -446,6 +471,18 @@ const styles = StyleSheet.create({
   },
   sendButtonActive: {
     backgroundColor: '#4639eb',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statusContainer: {
+    marginLeft: 8,
+  },
+  statusIcon: {
+    marginLeft: 2,
   },
 });
 

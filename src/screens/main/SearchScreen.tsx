@@ -529,26 +529,23 @@ const SearchScreen: React.FC = () => {
       )}
 
       {/* Recent Searches & Trending */}
-      {!searchQuery && !showSuggestions && (
+      {!searchQuery && !showSuggestions && recentSearches.length > 0 && (
         <View style={styles.discoveryContainer}>
-          {recentSearches.length > 0 && (
-            <View style={styles.discoverySection}>
-              <Text style={styles.discoveryTitle}>Recent Searches</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {recentSearches.slice(0, 5).map((search, index) => (
-                  <TouchableOpacity
-                    key={`recent-${index}`}
-                    style={styles.discoveryChip}
-                    onPress={() => setSearchQuery(search)}
-                  >
-                    <Ionicons name="time-outline" size={16} color="#6B7280" />
-                    <Text style={styles.discoveryChipText}>{search}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
+          <View style={styles.discoverySection}>
+            <Text style={styles.discoveryTitle}>Recent Searches</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {recentSearches.slice(0, 5).map((search, index) => (
+                <TouchableOpacity
+                  key={`recent-${index}`}
+                  style={styles.discoveryChip}
+                  onPress={() => setSearchQuery(search)}
+                >
+                  <Ionicons name="time-outline" size={16} color="#6B7280" />
+                  <Text style={styles.discoveryChipText}>{search}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </View>
       )}
 

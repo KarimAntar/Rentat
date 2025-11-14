@@ -205,7 +205,9 @@ export class ChatService {
       q,
       (snap) => {
         const msgs = snap.docs.map((d) => mapMessageDoc(d.id, d.data()));
-        callback(msgs);
+        // Sort messages by timestamp to ensure proper order
+        const sortedMsgs = msgs.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        callback(sortedMsgs);
       },
       (err) => console.error('subscribeToMessages error:', err)
     );
@@ -223,6 +225,7 @@ export class ChatService {
       content,
       status: {
         sent: serverTimestamp(),
+        delivered: serverTimestamp(), // Mark as delivered immediately for all recipients
       },
       timestamp: serverTimestamp(),
     });
