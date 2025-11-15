@@ -48,9 +48,12 @@ const ChatScreen: React.FC = () => {
     initializeChat();
   }, []);
 
+  // State to track if we should scroll to bottom
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
+
   // Auto-scroll to bottom when messages are loaded or updated
   useLayoutEffect(() => {
-    if (messages.length > 0 && !loading) {
+    if (messages.length > 0 && !loading && shouldScrollToBottom) {
       const scrollToBottom = () => {
         if (Platform.OS === 'web') {
           // For web, use a more reliable approach
@@ -78,11 +81,9 @@ const ChatScreen: React.FC = () => {
       };
 
       scrollToBottom();
-      // Additional attempts to ensure scrolling works
-      setTimeout(scrollToBottom, 200);
-      setTimeout(scrollToBottom, 500);
+      setShouldScrollToBottom(false);
     }
-  }, [messages.length, loading]);
+  }, [messages.length, loading, shouldScrollToBottom]);
 
   const initializeChat = async () => {
     try {
@@ -155,7 +156,8 @@ const ChatScreen: React.FC = () => {
               senderAvatar: (m.senderId === user.uid ? user.photoURL : undefined) || undefined,
             }))
           );
-          setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 50);
+          // Trigger scroll to bottom when messages are loaded
+          setShouldScrollToBottom(true);
         });
         await ChatService.markAsRead(existingChat.id, user.uid);
         return () => unsubscribe();
@@ -209,6 +211,8 @@ const ChatScreen: React.FC = () => {
           content: { text },
           type: 'text',
         });
+        // Scroll to bottom when sending a message
+        setShouldScrollToBottom(true);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -264,6 +268,7 @@ const ChatScreen: React.FC = () => {
         style={styles.messagesScroll}
         contentContainerStyle={styles.messagesContent}
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => setShouldScrollToBottom(true)}
       >
       {messages.map((msg, index) => {
         const isMyMessage = msg.senderId === user?.uid;
