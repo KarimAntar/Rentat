@@ -368,6 +368,59 @@ service cloud.firestore {
       allow update: if false; // Logs are immutable
       allow delete: if false; // Logs should not be deleted
     }
+
+    // Disputes collection - for admin dashboard
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated() && (
+        // Users involved in dispute can read
+        resource.data.reportedBy == request.auth.uid ||
+        resource.data.reportedAgainst == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAdmin(); // Only admins can update disputes
+      allow delete: if isAdmin();
+    }
+
+    // Moderation queue collection - for admin dashboard
+    match /moderation_queue/{queueId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // Users can flag content
+      allow update: if isAdmin(); // Only admins can moderate
+      allow delete: if isAdmin();
+    }
+
+    // Feature flags collection - for admin dashboard
+    match /feature_flags/{flagId} {
+      allow read: if true; // Public read for client-side feature checking
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Notification campaigns collection - for admin dashboard
+    match /notification_campaigns/{campaignId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Platform settings collection - for admin dashboard
+    match /platform_settings/{settingsId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Platform config collection - for commission settings
+    match /platform_config/{configId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
     
     // Cloud Storage rules for file uploads
     match /user_uploads/{userId}/{allPaths=**} {

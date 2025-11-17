@@ -9,6 +9,13 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { UsersPage } from './pages/UsersPage';
 import { ItemsPage } from './pages/ItemsPage';
+import { RentalsPage } from './pages/RentalsPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { FeatureFlagsPage } from './pages/FeatureFlagsPage';
+import { DisputesPage } from './pages/DisputesPage';
+import { ModerationPage } from './pages/ModerationPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 // Protected Route wrapper
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -111,15 +118,85 @@ function AppContent() {
         }
       />
 
+      {/* Rentals Management */}
       <Route
         path="/rentals"
         element={
           <ProtectedRoute>
             <DashboardLayout>
-              <Box sx={{ p: 3 }}>
-                <h2>Rentals Management</h2>
-                <p>Coming soon...</p>
-              </Box>
+              <RentalsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Analytics */}
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <AnalyticsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Notifications */}
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <NotificationsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Feature Flags */}
+      <Route
+        path="/feature-flags"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <FeatureFlagsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Disputes */}
+      <Route
+        path="/disputes"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <DisputesPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Moderation */}
+      <Route
+        path="/moderation"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <ModerationPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Settings */}
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <SettingsPage />
             </DashboardLayout>
           </ProtectedRoute>
         }
