@@ -14,10 +14,9 @@ import {
   CardActions,
   Grid,
   Avatar,
-  Link,
   Divider,
 } from '@mui/material';
-import { CheckCircle, Cancel, Visibility, Block } from '@mui/icons-material';
+import { Cancel, Visibility, Block } from '@mui/icons-material';
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
