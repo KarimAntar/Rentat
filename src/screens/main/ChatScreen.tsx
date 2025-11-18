@@ -6,7 +6,6 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
   Image,
   Platform,
 } from 'react-native';
@@ -14,11 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuthContext } from '../../contexts/AuthContext';
+import { useModal } from '../../contexts/ModalContext';
 import { Chat, Message, User, Item, Rental } from '../../types';
 import ChatService, { mapChatDoc } from '../../services/chat';
 import { db, collections } from '../../config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { moderationService, ReportReason } from '../../services/moderation';
+import ReportModal from '../../components/ui/ReportModal';
 import Toast from 'react-native-toast-message';
 
 interface MessageWithUser extends Message {
@@ -36,6 +37,7 @@ const ChatScreen: React.FC = () => {
     itemId?: string;
   };
   const { user } = useAuthContext();
+  const { showModal } = useModal();
 
   const [messages, setMessages] = useState<MessageWithUser[]>([]);
   const [messageText, setMessageText] = useState('');
@@ -43,6 +45,11 @@ const ChatScreen: React.FC = () => {
   const [otherUser, setOtherUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+
+  // Modal states
+  const [reportUserModalVisible, setReportUserModalVisible] = useState(false);
+  const [reportMessageModalVisible, setReportMessageModalVisible] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<MessageWithUser | null>(null);
 
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -179,7 +186,11 @@ const ChatScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error initializing chat:', error);
-      Alert.alert('Error', 'Failed to load chat');
+      showModal({
+        title: 'Error',
+        message: 'Failed to load chat',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -218,7 +229,11 @@ const ChatScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message');
+      showModal({
+        title: 'Error',
+        message: 'Failed to send message',
+        type: 'error',
+      });
     } finally {
       setSending(false);
     }
@@ -231,56 +246,42 @@ const ChatScreen: React.FC = () => {
 
   const handleReportUser = () => {
     if (!user || !otherUser) {
-      Alert.alert('Error', 'Unable to report user');
+      showModal({
+        title: 'Error',
+        message: 'Unable to report user',
+        type: 'error',
+      });
       return;
     }
 
-    Alert.alert(
-      'Report User',
-      'Why are you reporting this user?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Harassment', onPress: () => submitUserReport('harassment') },
-        { text: 'Inappropriate Content', onPress: () => submitUserReport('inappropriate_content') },
-        { text: 'Scam/Fraud', onPress: () => submitUserReport('scam') },
-        { text: 'Spam', onPress: () => submitUserReport('spam') },
-        { text: 'Other', onPress: () => submitUserReport('other') },
-      ]
-    );
+    setReportUserModalVisible(true);
   };
 
-  const submitUserReport = async (reason: ReportReason) => {
+  const handleReportUserSubmit = async (reason: ReportReason, description: string) => {
     if (!user || !otherUser) return;
 
-    Alert.prompt(
-      'Report Details',
-      'Please provide additional details about this report:',
-      async (text) => {
-        if (!text || text.trim() === '') {
-          Alert.alert('Error', 'Please provide a description');
-          return;
-        }
+    try {
+      await moderationService.reportUser(
+        otherUser.uid,
+        user.uid,
+        reason,
+        description
+      );
 
-        try {
-          await moderationService.reportUser(
-            otherUser.uid,
-            user.uid,
-            reason,
-            text.trim()
-          );
-
-          Toast.show({
-            type: 'success',
-            text1: 'Report Submitted',
-            text2: 'Thank you for helping keep Rentat safe',
-            position: 'top',
-          });
-        } catch (error) {
-          console.error('Error submitting report:', error);
-          Alert.alert('Error', 'Failed to submit report. Please try again.');
-        }
-      }
-    );
+      Toast.show({
+        type: 'success',
+        text1: 'Report Submitted',
+        text2: 'Thank you for helping keep Rentat safe',
+        position: 'top',
+      });
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      showModal({
+        title: 'Error',
+        message: 'Failed to submit report. Please try again.',
+        type: 'error',
+      });
+    }
   };
 
   const handleReportMessage = (message: MessageWithUser) => {
@@ -288,54 +289,37 @@ const ChatScreen: React.FC = () => {
       return;
     }
 
-    Alert.alert(
-      'Report Message',
-      'Why are you reporting this message?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Harassment', onPress: () => submitMessageReport(message, 'harassment') },
-        { text: 'Inappropriate Content', onPress: () => submitMessageReport(message, 'inappropriate_content') },
-        { text: 'Scam/Fraud', onPress: () => submitMessageReport(message, 'scam') },
-        { text: 'Spam', onPress: () => submitMessageReport(message, 'spam') },
-        { text: 'Other', onPress: () => submitMessageReport(message, 'other') },
-      ]
-    );
+    setSelectedMessage(message);
+    setReportMessageModalVisible(true);
   };
 
-  const submitMessageReport = async (message: MessageWithUser, reason: ReportReason) => {
-    if (!user || !chat || !otherUser) return;
+  const handleReportMessageSubmit = async (reason: ReportReason, description: string) => {
+    if (!user || !chat || !otherUser || !selectedMessage) return;
 
-    Alert.prompt(
-      'Report Details',
-      'Please provide additional details about this report:',
-      async (text) => {
-        if (!text || text.trim() === '') {
-          Alert.alert('Error', 'Please provide a description');
-          return;
-        }
+    try {
+      await moderationService.reportChat(
+        chat.id,
+        selectedMessage.id,
+        user.uid,
+        otherUser.uid,
+        reason,
+        `Message: "${selectedMessage.content.text}"\n\nReason: ${description}`
+      );
 
-        try {
-          await moderationService.reportChat(
-            chat.id,
-            message.id,
-            user.uid,
-            otherUser.uid,
-            reason,
-            `Message: "${message.content.text}"\n\nReason: ${text.trim()}`
-          );
-
-          Toast.show({
-            type: 'success',
-            text1: 'Report Submitted',
-            text2: 'Thank you for helping keep Rentat safe',
-            position: 'top',
-          });
-        } catch (error) {
-          console.error('Error submitting report:', error);
-          Alert.alert('Error', 'Failed to submit report. Please try again.');
-        }
-      }
-    );
+      Toast.show({
+        type: 'success',
+        text1: 'Report Submitted',
+        text2: 'Thank you for helping keep Rentat safe',
+        position: 'top',
+      });
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      showModal({
+        title: 'Error',
+        message: 'Failed to submit report. Please try again.',
+        type: 'error',
+      });
+    }
   };
 
   if (loading) {
@@ -450,6 +434,39 @@ const ChatScreen: React.FC = () => {
           <Ionicons name="send" size={20} color={messageText.trim() ? '#FFFFFF' : '#9CA3AF'} />
         </TouchableOpacity>
       </View>
+
+      {/* Report Modals */}
+      <ReportModal
+        visible={reportUserModalVisible}
+        title="Report User"
+        message="Why are you reporting this user?"
+        reasons={[
+          { label: 'Harassment', value: 'harassment' },
+          { label: 'Inappropriate Content', value: 'inappropriate_content' },
+          { label: 'Scam/Fraud', value: 'scam' },
+          { label: 'Spam', value: 'spam' },
+          { label: 'Other', value: 'other' },
+        ]}
+        onSubmit={handleReportUserSubmit}
+        onCancel={() => setReportUserModalVisible(false)}
+        type="user"
+      />
+
+      <ReportModal
+        visible={reportMessageModalVisible}
+        title="Report Message"
+        message="Why are you reporting this message?"
+        reasons={[
+          { label: 'Harassment', value: 'harassment' },
+          { label: 'Inappropriate Content', value: 'inappropriate_content' },
+          { label: 'Scam/Fraud', value: 'scam' },
+          { label: 'Spam', value: 'spam' },
+          { label: 'Other', value: 'other' },
+        ]}
+        onSubmit={handleReportMessageSubmit}
+        onCancel={() => setReportMessageModalVisible(false)}
+        type="message"
+      />
     </SafeAreaView>
   );
 };

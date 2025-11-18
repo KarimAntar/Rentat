@@ -6,7 +6,6 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Share,
   Platform,
@@ -18,12 +17,14 @@ import Button from '../../components/ui/Button';
 import Toast from 'react-native-toast-message';
 import { ItemService, UserService } from '../../services/firestore';
 import { useAuthContext } from '../../contexts/AuthContext';
+import { useModal } from '../../contexts/ModalContext';
 import { authService } from '../../services/auth';
 import ChatService from '../../services/chat';
 import { Item, User } from '../../types';
 import { getCategoryById } from '../../data/categories';
 import { getGovernorateById } from '../../data/governorates';
 import { moderationService, ReportReason } from '../../services/moderation';
+import ReportModal from '../../components/ui/ReportModal';
 
 
 const { width } = Dimensions.get('window');
@@ -33,6 +34,7 @@ const ItemDetailScreen: React.FC = () => {
   const route = useRoute();
   const { itemId } = route.params as { itemId: string };
   const { user } = useAuthContext();
+  const { showModal } = useModal();
 
   const [item, setItem] = useState<Item | null>(null);
   const [owner, setOwner] = useState<User | null>(null);
@@ -42,6 +44,9 @@ const ItemDetailScreen: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [currentX, setCurrentX] = useState(0);
+
+  // Modal state
+  const [reportModalVisible, setReportModalVisible] = useState(false);
 
   useEffect(() => {
     loadItem();
@@ -84,7 +89,11 @@ const ItemDetailScreen: React.FC = () => {
         }
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to load item details');
+      showModal({
+        title: 'Error',
+        message: 'Failed to load item details',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -96,7 +105,11 @@ const ItemDetailScreen: React.FC = () => {
       return;
     }
     if (item?.ownerId === user.uid) {
-      Alert.alert('Cannot Rent', 'You cannot rent your own item');
+      showModal({
+        title: 'Cannot Rent',
+        message: 'You cannot rent your own item',
+        type: 'warning',
+      });
       return;
     }
     (navigation as any).navigate('RentalRequest', { itemId: item?.id });
@@ -104,7 +117,11 @@ const ItemDetailScreen: React.FC = () => {
 
   const handleFavorite = async () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to save favorites');
+      showModal({
+        title: 'Sign In Required',
+        message: 'Please sign in to save favorites',
+        type: 'info',
+      });
       return;
     }
     setIsFavorite(!isFavorite);
@@ -121,93 +138,68 @@ const ItemDetailScreen: React.FC = () => {
 
   const handleReport = () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to report this item');
-      return;
-    }
-    
-    if (item?.ownerId === user.uid) {
-      Alert.alert('Cannot Report', 'You cannot report your own item');
+      showModal({
+        title: 'Sign In Required',
+        message: 'Please sign in to report this item',
+        type: 'info',
+      });
       return;
     }
 
-    // Show report reasons
-    Alert.alert(
-      'Report Item',
-      'Why are you reporting this item?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Spam',
-          onPress: () => submitReport('spam')
-        },
-        {
-          text: 'Inappropriate Content',
-          onPress: () => submitReport('inappropriate_content')
-        },
-        {
-          text: 'Scam/Fraud',
-          onPress: () => submitReport('scam')
-        },
-        {
-          text: 'Fake Listing',
-          onPress: () => submitReport('fake_listing')
-        },
-        {
-          text: 'Dangerous Item',
-          onPress: () => submitReport('dangerous_item')
-        },
-        {
-          text: 'Other',
-          onPress: () => submitReport('other')
-        },
-      ]
-    );
+    if (item?.ownerId === user.uid) {
+      showModal({
+        title: 'Cannot Report',
+        message: 'You cannot report your own item',
+        type: 'warning',
+      });
+      return;
+    }
+
+    setReportModalVisible(true);
   };
 
-  const submitReport = async (reason: ReportReason) => {
+  const handleReportSubmit = async (reason: ReportReason, description: string) => {
     if (!item || !user) return;
 
-    Alert.prompt(
-      'Report Details',
-      'Please provide additional details about this report:',
-      async (text) => {
-        if (!text || text.trim() === '') {
-          Alert.alert('Error', 'Please provide a description');
-          return;
-        }
+    try {
+      await moderationService.reportItem(
+        item.id,
+        user.uid,
+        reason,
+        description
+      );
 
-        try {
-          await moderationService.reportItem(
-            item.id,
-            user.uid,
-            reason,
-            text.trim()
-          );
-
-          Toast.show({
-            type: 'success',
-            text1: 'Report Submitted',
-            text2: 'Thank you for helping keep Rentat safe',
-            position: 'top',
-          });
-        } catch (error) {
-          console.error('Error submitting report:', error);
-          Alert.alert('Error', 'Failed to submit report. Please try again.');
-        }
-      }
-    );
+      Toast.show({
+        type: 'success',
+        text1: 'Report Submitted',
+        text2: 'Thank you for helping keep Rentat safe',
+        position: 'top',
+      });
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      showModal({
+        title: 'Error',
+        message: 'Failed to submit report. Please try again.',
+        type: 'error',
+      });
+    }
   };
 
   const handleContact = async () => {
     if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to contact the owner');
+      showModal({
+        title: 'Sign In Required',
+        message: 'Please sign in to contact the owner',
+        type: 'info',
+      });
       return;
     }
     if (!item || item.ownerId === user.uid) {
-      Alert.alert('Cannot Contact', 'You cannot contact yourself');
+      showModal({
+        title: 'Cannot Contact',
+        message: 'You cannot contact yourself',
+        type: 'warning',
+      });
       return;
     }
 
@@ -238,7 +230,11 @@ const ItemDetailScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error creating/finding chat:', error);
-      Alert.alert('Error', 'Failed to open chat. Please try again.');
+      showModal({
+        title: 'Error',
+        message: 'Failed to open chat. Please try again.',
+        type: 'error',
+      });
     }
   };
 
@@ -249,11 +245,15 @@ const ItemDetailScreen: React.FC = () => {
 
   const handleDelete = () => {
     if (!item) return;
-    Alert.alert(
-      'Delete Item',
-      'Are you sure you want to remove this listing?',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showModal({
+      title: 'Delete Item',
+      message: 'Are you sure you want to remove this listing?',
+      buttons: [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => {},
+        },
         {
           text: 'Delete',
           style: 'destructive',
@@ -267,12 +267,17 @@ const ItemDetailScreen: React.FC = () => {
               });
               (navigation as any).goBack();
             } catch (e) {
-              Alert.alert('Error', 'Failed to delete item');
+              showModal({
+                title: 'Error',
+                message: 'Failed to delete item',
+                type: 'error',
+              });
             }
-          }
-        }
-      ]
-    );
+          },
+        },
+      ],
+      type: 'warning',
+    });
   };
 
   const formatPrice = (price: number) => {
@@ -737,6 +742,24 @@ const ItemDetailScreen: React.FC = () => {
           </View>
         </View>
       )}
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={reportModalVisible}
+        title="Report Item"
+        message="Why are you reporting this item?"
+        reasons={[
+          { label: 'Spam', value: 'spam' },
+          { label: 'Inappropriate Content', value: 'inappropriate_content' },
+          { label: 'Scam/Fraud', value: 'scam' },
+          { label: 'Fake Listing', value: 'fake_listing' },
+          { label: 'Dangerous Item', value: 'dangerous_item' },
+          { label: 'Other', value: 'other' },
+        ]}
+        onSubmit={handleReportSubmit}
+        onCancel={() => setReportModalVisible(false)}
+        type="item"
+      />
     </SafeAreaView>
   );
 };
