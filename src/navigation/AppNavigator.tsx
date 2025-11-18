@@ -383,6 +383,11 @@ const AppNavigator: React.FC = () => {
         <RootStack.Screen name="CreateItem" component={CreateItemScreen} />
         <RootStack.Screen name="EditItem" component={EditItemScreen} />
         <RootStack.Screen name="EditProfile" component={EditProfileScreen} />
+        <RootStack.Screen 
+          name="PublicProfile" 
+          component={require('../screens/main/PublicProfileScreen').default}
+          options={{ headerShown: false }}
+        />
         <RootStack.Screen name="Review" component={require('../screens/main/ReviewScreen').default} />
         <RootStack.Screen name="ItemDetails" component={ItemDetailScreen} />
         <RootStack.Screen name="Chat" component={require('../screens/main/ChatScreen').default} />
