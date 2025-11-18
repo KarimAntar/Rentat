@@ -155,10 +155,14 @@ export const ModerationPage: React.FC = () => {
   };
 
   const handleViewItem = (itemId: string) => {
-    // Open item in main app - assuming the main app is running on localhost:3000
-    // In production, this would be the main app's domain
-    const mainAppUrl = window.location.origin.replace(':5173', ':3000'); // Assuming admin dashboard is on 5173 and main app on 3000
-    const itemUrl = `${mainAppUrl}/item/${itemId}`;
+    // Open item in main app - use the main domain instead of admin subdomain
+    // In production, this would be the main app's domain (rentat.tech)
+    // For development, assume main app is on localhost:3000
+    const isProduction = window.location.hostname !== 'localhost';
+    const mainAppUrl = isProduction
+      ? 'https://rentat.tech'  // Main app domain
+      : 'http://localhost:3000'; // Development main app
+    const itemUrl = `${mainAppUrl}/items/${itemId}`;
     window.open(itemUrl, '_blank');
   };
 
@@ -332,7 +336,7 @@ export const ModerationPage: React.FC = () => {
 
                 <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                   <Chip
-                    label={`$${selectedItem.itemData.price || 0}`}
+                    label={`${selectedItem.itemData.pricing?.dailyRate || 0} EGP/day`}
                     color="primary"
                     variant="outlined"
                   />
@@ -348,7 +352,7 @@ export const ModerationPage: React.FC = () => {
 
                 {selectedItem.itemData.location && (
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    📍 {selectedItem.itemData.location}
+                    📍 {selectedItem.itemData.location.city || selectedItem.itemData.location.address || 'Location not specified'}
                   </Typography>
                 )}
               </Box>

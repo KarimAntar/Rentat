@@ -228,7 +228,7 @@ export const ItemsPage: React.FC = () => {
       headerName: 'Price',
       width: 100,
       valueGetter: (_value, row) => row.pricing?.dailyRate || 0,
-      valueFormatter: (params) => `$${params || 0}/day`,
+      valueFormatter: (params) => `${params || 0} EGP/day`,
     },
     {
       field: 'condition',
@@ -497,7 +497,7 @@ export const ItemsPage: React.FC = () => {
                         Price
                       </Typography>
                       <Typography variant="body1">
-                        ${selectedItem.pricing?.dailyRate || 0} per day
+                        {selectedItem.pricing?.dailyRate || 0} EGP per day
                       </Typography>
                     </Box>
 
