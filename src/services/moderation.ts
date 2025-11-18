@@ -111,17 +111,33 @@ export class ModerationService {
       const itemDoc = await getDoc(doc(db, collections.items, itemId));
       const itemData = itemDoc.data();
 
+      if (!itemData) {
+        throw new Error('Item not found');
+      }
+
+      // Get owner details
+      let ownerName = 'Unknown User';
+      if (itemData.ownerId) {
+        try {
+          const ownerDoc = await getDoc(doc(db, collections.users, itemData.ownerId));
+          const ownerData = ownerDoc.data();
+          ownerName = ownerData?.displayName || ownerData?.email || 'Unknown User';
+        } catch (ownerError) {
+          console.warn('Could not fetch owner details:', ownerError);
+        }
+      }
+
       const report: Omit<Report, 'id' | 'createdAt' | 'status'> = {
         type: 'item',
         reportedBy,
-        reportedAgainst: itemData?.ownerId || '',
+        reportedAgainst: itemData.ownerId || '',
         targetId: itemId,
         reason,
         description,
         priority: this.calculatePriority(reason),
         metadata: {
-          itemTitle: itemData?.title,
-          userName: itemData?.ownerName,
+          itemTitle: itemData.title,
+          userName: ownerName,
         },
       };
 
