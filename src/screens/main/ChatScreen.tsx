@@ -153,6 +153,16 @@ const ChatScreen: React.FC = () => {
       }
 
       if (existingChat) {
+        // Check if current user is a participant
+        if (!existingChat.participants.includes(user.uid)) {
+          showModal({
+            title: 'Error',
+            message: 'You do not have permission to access this chat.',
+            type: 'error',
+          });
+          setLoading(false);
+          return;
+        }
         setChat(existingChat);
         // Subscribe to messages only for real chat documents
         const unsubscribe = ChatService.subscribeToMessages(existingChat.id, (msgs) => {

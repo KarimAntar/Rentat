@@ -97,7 +97,7 @@ service cloud.firestore {
     
     // Chats collection - updated for item-specific chats
     match /chats/{chatId} {
-      // Allow read and list for authenticated users who are participants
+      // TEMPORARY: Allow all authenticated users to read and list all chats for testing
       allow read, list: if isAuthenticated();
 
       allow create: if isAuthenticated() &&
