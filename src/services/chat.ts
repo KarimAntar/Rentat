@@ -226,8 +226,12 @@ export class ChatService {
       q,
       (snap) => {
         const msgs = snap.docs.map((d) => mapMessageDoc(d.id, d.data()));
-        // Sort messages by timestamp to ensure proper order
-        const sortedMsgs = msgs.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        // Sort messages by timestamp, handling missing/invalid timestamps
+        const sortedMsgs = msgs.sort((a, b) => {
+          const aTime = a.timestamp instanceof Date && !isNaN(a.timestamp.getTime()) ? a.timestamp.getTime() : 0;
+          const bTime = b.timestamp instanceof Date && !isNaN(b.timestamp.getTime()) ? b.timestamp.getTime() : 0;
+          return aTime - bTime;
+        });
         callback(sortedMsgs);
       },
       (err) => console.error('subscribeToMessages error:', err)

@@ -38,6 +38,7 @@
     "expo-notifications": "~0.20.1",
     "expo-status-bar": "~1.6.0",
     "firebase": "^10.7.1",
+    "firebase-admin": "^13.6.0",
     "keen-slider": "^6.8.6",
     "react": "18.2.0",
     "react-dom": "18.2.0",

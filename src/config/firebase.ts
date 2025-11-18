@@ -1,6 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, initializeAuth, Auth } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, Firestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, connectFirestoreEmulator, Firestore } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator, Functions } from 'firebase/functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -59,8 +59,16 @@ try {
   auth = getAuth(app);
 }
 
-// Initialize Firestore
-const db: Firestore = getFirestore(app);
+/**
+ * Initialize Firestore with eur3 region for production.
+ * This ensures the app connects to the correct Firestore instance.
+ */
+let db: Firestore;
+if (!__DEV__) {
+  db = initializeFirestore(app, { host: 'eur3-firestore.googleapis.com', ssl: true });
+} else {
+  db = getFirestore(app);
+}
 
 // Initialize Storage
 const storage: FirebaseStorage = getStorage(app);
