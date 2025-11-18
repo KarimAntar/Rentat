@@ -97,28 +97,23 @@ export class ChatService {
     participants: string[],
     opts?: { type?: 'rental' | 'general'; rentalId?: string; itemId?: string }
   ): Promise<Chat | null> {
-    // Use array-contains queries which work reliably with Firestore security rules
-    // Query for chats where the first participant is in the participants array
-    const currentUserId = participants[0]; // Assume first participant is the current user
+    // Use participantsKey for exact matching - this works better with Firestore security rules
+    const sortedParticipants = [...participants].sort();
+    const participantsKey = sortedParticipants.join(':');
 
-    let constraints: any[] = [where('participants', 'array-contains', currentUserId)];
+    let constraints: any[] = [where('participantsKey', '==', participantsKey)];
 
     // Add additional filters
     if (opts?.type) constraints.push(where('type', '==', opts.type));
-    if (opts?.rentalId) constraints.push(where('rentalId', '==', opts.rentalId));
-    if (opts?.itemId) constraints.push(where('itemId', '==', opts.itemId));
+    if (opts?.rentalId) constraints.push(where('rentalId', '==', opts?.rentalId));
+    if (opts?.itemId) constraints.push(where('itemId', '==', opts?.itemId));
 
-    const q = query(collection(db, CHATS), ...constraints, limit(20));
+    const q = query(collection(db, CHATS), ...constraints, limit(1));
     const snap = await getDocs(q);
 
-    // Find chat that has exactly the right participants
-    for (const doc of snap.docs) {
-      const chatData = doc.data();
-      const chatParticipants = chatData.participants || [];
-      if (participants.every(p => chatParticipants.includes(p)) &&
-          chatParticipants.length === participants.length) {
-        return mapChatDoc(doc.id, doc.data());
-      }
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      return mapChatDoc(doc.id, doc.data());
     }
 
     return null;

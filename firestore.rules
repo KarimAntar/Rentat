@@ -97,8 +97,7 @@ service cloud.firestore {
     // Chats collection - updated for item-specific chats
     match /chats/{chatId} {
       // Allow read for authenticated users who are participants
-      // Using request.auth.uid in resource.data.participants instead of isParticipant helper
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
         request.auth.uid in resource.data.participants;
 
       allow create: if isAuthenticated() &&
