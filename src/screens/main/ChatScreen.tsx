@@ -144,6 +144,7 @@ const ChatScreen: React.FC = () => {
 
       if (existingChat) {
         setChat(existingChat);
+        // Subscribe to messages only for real chat documents
         const unsubscribe = ChatService.subscribeToMessages(existingChat.id, (msgs) => {
           // Mark messages from other users as read locally when chat is opened
           const updatedMsgs = msgs.map(m => {
@@ -171,6 +172,7 @@ const ChatScreen: React.FC = () => {
         await ChatService.markAsRead(existingChat.id, user.uid);
         return () => unsubscribe();
       } else {
+        // Create placeholder chat for UI display only - no Firestore subscription
         setChat({
           id: `placeholder-${Date.now()}`,
           participants: [user.uid, otherUserId || 'unknown'],
@@ -183,6 +185,7 @@ const ChatScreen: React.FC = () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+        // No subscription for placeholder chats
       }
     } catch (error) {
       console.error('Error initializing chat:', error);
@@ -211,12 +214,42 @@ const ChatScreen: React.FC = () => {
           { type: chat.type, rentalId: chat.rentalId, itemId: chat.itemId }
         );
         setChat(realChat);
+
+        // Subscribe to messages for the real chat
+        const unsubscribe = ChatService.subscribeToMessages(realChat.id, (msgs) => {
+          // Mark messages from other users as read locally when chat is opened
+          const updatedMsgs = msgs.map(m => {
+            if (m.senderId !== user.uid && !m.status?.read) {
+              return {
+                ...m,
+                status: {
+                  ...m.status,
+                  read: new Date(),
+                }
+              };
+            }
+            return m;
+          });
+          setMessages(
+            updatedMsgs.map(m => ({
+              ...m,
+              senderName: m.senderId === user.uid ? (user.displayName || 'You') : 'User',
+              senderAvatar: (m.senderId === user.uid ? user.photoURL : undefined) || undefined,
+            }))
+          );
+          // Trigger scroll to bottom when messages are loaded
+          setShouldScrollToBottom(true);
+        });
+
         await ChatService.sendMessage({
           chatId: realChat.id,
           senderId: user.uid,
           content: { text },
           type: 'text',
         });
+
+        await ChatService.markAsRead(realChat.id, user.uid);
+        return () => unsubscribe();
       } else {
         await ChatService.sendMessage({
           chatId: chat.id,
