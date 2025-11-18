@@ -108,16 +108,18 @@ export const NotificationsPage: React.FC = () => {
         ...(imageUrl && { imageUrl }),
         targetAudience: {
           type: audienceType,
-          filters: audienceType === 'custom' ? [
-            ...(filters.verified ? [{ field: 'verified' as const, operator: 'equals' as const, value: true }] : []),
-            ...(filters.unverified ? [{ field: 'verified' as const, operator: 'equals' as const, value: false }] : []),
-          ] : undefined,
+          ...(audienceType === 'custom' && {
+            filters: [
+              ...(filters.verified ? [{ field: 'verified' as const, operator: 'equals' as const, value: true }] : []),
+              ...(filters.unverified ? [{ field: 'verified' as const, operator: 'equals' as const, value: false }] : []),
+            ]
+          }),
         },
         scheduling: {
           type: schedulingType,
-          scheduledAt: schedulingType === 'scheduled' && scheduledDate
-            ? new Date(scheduledDate)
-            : undefined,
+          ...(schedulingType === 'scheduled' && scheduledDate && {
+            scheduledAt: new Date(scheduledDate)
+          }),
         },
         status: schedulingType === 'immediate' ? 'sending' : 'scheduled',
         stats: {
