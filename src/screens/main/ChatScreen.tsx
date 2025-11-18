@@ -419,7 +419,28 @@ const ChatScreen: React.FC = () => {
         style={styles.messagesScroll}
         contentContainerStyle={styles.messagesContent}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => setShouldScrollToBottom(true)}
+        onContentSizeChange={() => {
+          if (Platform.OS === 'web') {
+            setTimeout(() => {
+              const scrollView = scrollViewRef.current as any;
+              if (scrollView && scrollView.scrollToEnd) {
+                scrollView.scrollToEnd({ animated: false });
+              } else {
+                const scrollContainers = document.querySelectorAll('[style*="overflow"]');
+                scrollContainers.forEach(container => {
+                  const element = container as HTMLElement;
+                  if (element.scrollHeight > element.clientHeight) {
+                    element.scrollTop = element.scrollHeight;
+                  }
+                });
+              }
+            }, 100);
+          } else {
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: false });
+            }, 100);
+          }
+        }}
       >
       {messages.map((msg, index) => {
         const isMyMessage = msg.senderId === user?.uid;
