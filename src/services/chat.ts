@@ -91,16 +91,12 @@ const mapMessageDoc = (id: string, data: any): Message => {
 
 export class ChatService {
   /**
-   * Find an existing chat by participants (and optional rentalId/type)
+   * Find an existing chat by participants key (and optional rentalId/type)
    */
-  static async findChatByParticipants(
-    participants: string[],
+  static async findChatByParticipantsKey(
+    participantsKey: string,
     opts?: { type?: 'rental' | 'general'; rentalId?: string; itemId?: string }
   ): Promise<Chat | null> {
-    // Use participantsKey for exact matching - this works better with Firestore security rules
-    const sortedParticipants = [...participants].sort();
-    const participantsKey = sortedParticipants.join(':');
-
     let constraints: any[] = [where('participantsKey', '==', participantsKey)];
 
     // Add additional filters
@@ -163,7 +159,8 @@ export class ChatService {
     opts?: DirectChatOptions
   ): Promise<Chat> {
     const participants = [currentUserId, otherUserId].sort(); // Sort for consistency
-    const existing = await this.findChatByParticipants(participants, {
+    const participantsKey = buildParticipantsKey(participants);
+    const existing = await this.findChatByParticipantsKey(participantsKey, {
       type: opts?.type,
       rentalId: opts?.rentalId,
       itemId: opts?.itemId,

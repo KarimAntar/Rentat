@@ -146,8 +146,8 @@ const ChatScreen: React.FC = () => {
           existingChat = mapChatDoc(chatDoc.id, chatDoc.data());
         }
       } else {
-        existingChat = await ChatService.findChatByParticipants(
-          [user.uid, otherUserId || 'unknown'],
+        existingChat = await ChatService.findChatByParticipantsKey(
+          [user.uid, otherUserId || 'unknown'].sort().join(':'),
           { type: rentalId ? 'rental' : 'general', rentalId, itemId }
         );
       }

@@ -96,8 +96,8 @@ service cloud.firestore {
     
     // Chats collection - updated for item-specific chats
     match /chats/{chatId} {
-      // Allow read for authenticated users who are participants
-      allow read: if isAuthenticated() &&
+      // Allow read and list for authenticated users who are participants
+      allow read, list: if isAuthenticated() &&
         request.auth.uid in resource.data.participants;
 
       allow create: if isAuthenticated() &&
@@ -178,10 +178,7 @@ service cloud.firestore {
       allow read: if isAuthenticated() &&
         isOwner(resource.data.userId);
 
-      allow create: if isAdmin() || // Only system can create notifications
-        // Allow moderation system to create admin notifications
-        (request.resource.data.type in ['moderation_alert', 'dispute_alert'] &&
-         exists(/databases/$(database)/documents/admins/$(request.resource.data.userId)));
+      allow create: if isAuthenticated(); // Allow authenticated users to create notifications
 
       allow update: if isAuthenticated() &&
         isOwner(resource.data.userId) &&
