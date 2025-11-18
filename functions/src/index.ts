@@ -740,7 +740,7 @@ async function getTargetUsers(audience: any): Promise<any[]> {
   }
 
   const snapshot = await query.get();
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
 }
 
 // Function to send batch notifications
