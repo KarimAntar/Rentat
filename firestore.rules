@@ -423,7 +423,7 @@ service cloud.firestore {
 
     // Platform config collection - for commission settings
     match /platform_config/{configId} {
-      allow read: if isAdmin();
+      allow read: if isAuthenticated(); // Allow authenticated users to read commission config
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
