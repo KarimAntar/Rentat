@@ -59,12 +59,24 @@ const PublicProfileScreen: React.FC = () => {
       const userDoc = await getDoc(doc(db, collections.users, userId));
       
       if (userDoc.exists()) {
-        const userData = {
-          id: userDoc.id,
-          ...userDoc.data(),
-          createdAt: userDoc.data().createdAt?.toDate(),
-          updatedAt: userDoc.data().updatedAt?.toDate(),
-        } as User;
+        const data = userDoc.data();
+        const userData: User = {
+          uid: userDoc.id,
+          email: data.email || '',
+          displayName: data.displayName || '',
+          photoURL: data.photoURL,
+          location: data.location || { latitude: 0, longitude: 0, address: '', city: '', country: '' },
+          verification: data.verification || { isVerified: false, verificationStatus: 'pending' },
+          ratings: data.ratings || { asOwner: { average: 0, count: 0 }, asRenter: { average: 0, count: 0 } },
+          wallet: data.wallet || { balance: 0, pendingBalance: 0, totalEarnings: 0 },
+          preferences: data.preferences,
+          stats: data.stats || { itemsListed: 0, itemsRented: 0, successfulRentals: 0 },
+          favorites: data.favorites || [],
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+          isActive: data.isActive ?? true,
+          fcmTokens: data.fcmTokens || [],
+        };
         
         setUser(userData);
 
@@ -170,7 +182,7 @@ const PublicProfileScreen: React.FC = () => {
           <Ionicons name="person-circle" size={40} color="#6B7280" />
           <View style={styles.reviewerDetails}>
             <Text style={styles.reviewerName}>
-              {review.isAnonymous ? 'Anonymous' : 'User'}
+              Reviewer
             </Text>
             <Text style={styles.reviewDate}>
               {review.createdAt?.toLocaleDateString()}
@@ -191,7 +203,7 @@ const PublicProfileScreen: React.FC = () => {
       {review.response && (
         <View style={styles.responseContainer}>
           <Text style={styles.responseLabel}>Owner's response:</Text>
-          <Text style={styles.responseText}>{review.response}</Text>
+          <Text style={styles.responseText}>{review.response.comment}</Text>
         </View>
       )}
     </View>
