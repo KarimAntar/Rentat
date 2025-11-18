@@ -408,7 +408,7 @@ service cloud.firestore {
 
     // Platform settings collection - for admin dashboard
     match /platform_settings/{settingsId} {
-      allow read: if isAdmin();
+      allow read: if isAuthenticated(); // Users need to read commission rates
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();

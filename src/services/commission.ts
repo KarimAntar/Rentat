@@ -8,7 +8,9 @@ import {
   where,
   getDocs,
   serverTimestamp,
-  runTransaction
+  runTransaction,
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { db, collections } from '../config/firebase';
 import { Rental, WalletTransaction, User } from '../types';
@@ -70,6 +72,7 @@ export interface RevenueAnalytics {
 export class CommissionService {
   private static instance: CommissionService;
   private config: CommissionConfig;
+  private configLoaded: boolean = false;
 
   private constructor() {
     // Default commission configuration
@@ -119,8 +122,66 @@ export class CommissionService {
   public static getInstance(): CommissionService {
     if (!CommissionService.instance) {
       CommissionService.instance = new CommissionService();
+      // Load config from Firestore on initialization
+      CommissionService.instance.loadConfigFromFirestore();
     }
     return CommissionService.instance;
+  }
+
+  // Load commission configuration from Firestore
+  private async loadConfigFromFirestore(): Promise<void> {
+    try {
+      console.log('Loading commission config from Firestore...');
+      
+      // First, try to load from platform_settings
+      const settingsRef = doc(db, 'platform_settings', 'global');
+      const settingsDoc = await getDoc(settingsRef);
+      
+      if (settingsDoc.exists()) {
+        const data = settingsDoc.data();
+        if (data.commissionRate) {
+          // Update base rate from platform settings
+          this.config.baseRate = data.commissionRate / 100; // Convert percentage to decimal
+          console.log('Commission rate loaded from platform_settings:', this.config.baseRate);
+        }
+      }
+
+      // Then try to load full config from platform_config
+      const configQuery = query(
+        collection(db, 'platform_config'),
+        orderBy('updatedAt', 'desc'),
+        limit(1)
+      );
+      
+      const configSnapshot = await getDocs(configQuery);
+      
+      if (!configSnapshot.empty) {
+        const latestConfig = configSnapshot.docs[0];
+        const storedConfig = latestConfig.data().config;
+        
+        if (storedConfig) {
+          // Merge stored config with default config
+          this.config = {
+            ...this.config,
+            ...storedConfig,
+          };
+          console.log('Commission config loaded from platform_config:', this.config);
+        }
+      }
+      
+      this.configLoaded = true;
+    } catch (error) {
+      console.error('Error loading commission config from Firestore:', error);
+      console.log('Using default commission configuration');
+      this.configLoaded = true; // Mark as loaded even on error to prevent infinite retries
+    }
+  }
+
+  // Ensure config is loaded before using
+  private async ensureConfigLoaded(): Promise<void> {
+    if (!this.configLoaded) {
+      await this.loadConfigFromFirestore();
+    }
   }
 
   // Calculate commission for a rental
@@ -130,6 +191,9 @@ export class CommissionService {
     category: string
   ): Promise<CommissionCalculation> {
     try {
+      // Ensure config is loaded from Firestore
+      await this.ensureConfigLoaded();
+      
       // Get user's tier based on completed rentals
       const userTier = await this.getUserTier(ownerId);
       

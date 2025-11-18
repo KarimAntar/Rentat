@@ -23,6 +23,7 @@ import ChatService from '../../services/chat';
 import { Item, User } from '../../types';
 import { getCategoryById } from '../../data/categories';
 import { getGovernorateById } from '../../data/governorates';
+import { moderationService, ReportReason } from '../../services/moderation';
 
 
 const { width } = Dimensions.get('window');
@@ -116,6 +117,88 @@ const ItemDetailScreen: React.FC = () => {
         url: `https://rentat.app/items/${itemId}`,
       });
     } catch (error) {}
+  };
+
+  const handleReport = () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to report this item');
+      return;
+    }
+    
+    if (item?.ownerId === user.uid) {
+      Alert.alert('Cannot Report', 'You cannot report your own item');
+      return;
+    }
+
+    // Show report reasons
+    Alert.alert(
+      'Report Item',
+      'Why are you reporting this item?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Spam',
+          onPress: () => submitReport('spam')
+        },
+        {
+          text: 'Inappropriate Content',
+          onPress: () => submitReport('inappropriate_content')
+        },
+        {
+          text: 'Scam/Fraud',
+          onPress: () => submitReport('scam')
+        },
+        {
+          text: 'Fake Listing',
+          onPress: () => submitReport('fake_listing')
+        },
+        {
+          text: 'Dangerous Item',
+          onPress: () => submitReport('dangerous_item')
+        },
+        {
+          text: 'Other',
+          onPress: () => submitReport('other')
+        },
+      ]
+    );
+  };
+
+  const submitReport = async (reason: ReportReason) => {
+    if (!item || !user) return;
+
+    Alert.prompt(
+      'Report Details',
+      'Please provide additional details about this report:',
+      async (text) => {
+        if (!text || text.trim() === '') {
+          Alert.alert('Error', 'Please provide a description');
+          return;
+        }
+
+        try {
+          await moderationService.reportItem(
+            item.id,
+            user.uid,
+            reason,
+            text.trim()
+          );
+
+          Toast.show({
+            type: 'success',
+            text1: 'Report Submitted',
+            text2: 'Thank you for helping keep Rentat safe',
+            position: 'top',
+          });
+        } catch (error) {
+          console.error('Error submitting report:', error);
+          Alert.alert('Error', 'Failed to submit report. Please try again.');
+        }
+      }
+    );
   };
 
   const handleContact = async () => {
@@ -246,6 +329,11 @@ const ItemDetailScreen: React.FC = () => {
                 color={isFavorite ? "#EF4444" : "#111827"}
               />
             </TouchableOpacity>
+            {item?.ownerId !== user?.uid && (
+              <TouchableOpacity onPress={handleReport} style={styles.actionButton}>
+                <Ionicons name="flag-outline" size={24} color="#111827" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 

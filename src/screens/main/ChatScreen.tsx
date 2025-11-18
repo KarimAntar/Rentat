@@ -18,6 +18,8 @@ import { Chat, Message, User, Item, Rental } from '../../types';
 import ChatService, { mapChatDoc } from '../../services/chat';
 import { db, collections } from '../../config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { moderationService, ReportReason } from '../../services/moderation';
+import Toast from 'react-native-toast-message';
 
 interface MessageWithUser extends Message {
   senderName: string;
@@ -227,6 +229,115 @@ const ChatScreen: React.FC = () => {
     return timestamp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
+  const handleReportUser = () => {
+    if (!user || !otherUser) {
+      Alert.alert('Error', 'Unable to report user');
+      return;
+    }
+
+    Alert.alert(
+      'Report User',
+      'Why are you reporting this user?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Harassment', onPress: () => submitUserReport('harassment') },
+        { text: 'Inappropriate Content', onPress: () => submitUserReport('inappropriate_content') },
+        { text: 'Scam/Fraud', onPress: () => submitUserReport('scam') },
+        { text: 'Spam', onPress: () => submitUserReport('spam') },
+        { text: 'Other', onPress: () => submitUserReport('other') },
+      ]
+    );
+  };
+
+  const submitUserReport = async (reason: ReportReason) => {
+    if (!user || !otherUser) return;
+
+    Alert.prompt(
+      'Report Details',
+      'Please provide additional details about this report:',
+      async (text) => {
+        if (!text || text.trim() === '') {
+          Alert.alert('Error', 'Please provide a description');
+          return;
+        }
+
+        try {
+          await moderationService.reportUser(
+            otherUser.uid,
+            user.uid,
+            reason,
+            text.trim()
+          );
+
+          Toast.show({
+            type: 'success',
+            text1: 'Report Submitted',
+            text2: 'Thank you for helping keep Rentat safe',
+            position: 'top',
+          });
+        } catch (error) {
+          console.error('Error submitting report:', error);
+          Alert.alert('Error', 'Failed to submit report. Please try again.');
+        }
+      }
+    );
+  };
+
+  const handleReportMessage = (message: MessageWithUser) => {
+    if (!user || message.senderId === user.uid) {
+      return;
+    }
+
+    Alert.alert(
+      'Report Message',
+      'Why are you reporting this message?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Harassment', onPress: () => submitMessageReport(message, 'harassment') },
+        { text: 'Inappropriate Content', onPress: () => submitMessageReport(message, 'inappropriate_content') },
+        { text: 'Scam/Fraud', onPress: () => submitMessageReport(message, 'scam') },
+        { text: 'Spam', onPress: () => submitMessageReport(message, 'spam') },
+        { text: 'Other', onPress: () => submitMessageReport(message, 'other') },
+      ]
+    );
+  };
+
+  const submitMessageReport = async (message: MessageWithUser, reason: ReportReason) => {
+    if (!user || !chat || !otherUser) return;
+
+    Alert.prompt(
+      'Report Details',
+      'Please provide additional details about this report:',
+      async (text) => {
+        if (!text || text.trim() === '') {
+          Alert.alert('Error', 'Please provide a description');
+          return;
+        }
+
+        try {
+          await moderationService.reportChat(
+            chat.id,
+            message.id,
+            user.uid,
+            otherUser.uid,
+            reason,
+            `Message: "${message.content.text}"\n\nReason: ${text.trim()}`
+          );
+
+          Toast.show({
+            type: 'success',
+            text1: 'Report Submitted',
+            text2: 'Thank you for helping keep Rentat safe',
+            position: 'top',
+          });
+        } catch (error) {
+          console.error('Error submitting report:', error);
+          Alert.alert('Error', 'Failed to submit report. Please try again.');
+        }
+      }
+    );
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -260,6 +371,9 @@ const ChatScreen: React.FC = () => {
         <TouchableOpacity style={styles.callButton}>
           <Ionicons name="call-outline" size={20} color="#4639eb" />
         </TouchableOpacity>
+        <TouchableOpacity style={styles.reportButton} onPress={handleReportUser}>
+          <Ionicons name="flag-outline" size={20} color="#EF4444" />
+        </TouchableOpacity>
       </View>
 
       {/* Scrollable Messages */}
@@ -284,9 +398,11 @@ const ChatScreen: React.FC = () => {
         const status = getMessageStatus();
 
         return (
-          <View
+          <TouchableOpacity
             key={msg.id}
             style={[styles.messageRow, isMyMessage ? styles.myMessageRow : styles.otherMessageRow]}
+            onLongPress={() => !isMyMessage && handleReportMessage(msg)}
+            activeOpacity={isMyMessage ? 1 : 0.7}
           >
             <View style={[styles.messageBubble, isMyMessage ? styles.myBubble : styles.otherBubble]}>
               <Text style={[styles.messageText, isMyMessage ? styles.myText : styles.otherText]}>
@@ -308,7 +424,7 @@ const ChatScreen: React.FC = () => {
                 )}
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         );
       })}
       </ScrollView>
@@ -397,6 +513,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     backgroundColor: '#F0F9FF',
+  },
+  reportButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#FEE2E2',
   },
   messagesScroll: {
     flex: 1,
