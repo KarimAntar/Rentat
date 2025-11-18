@@ -65,7 +65,7 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
             ...button,
             onPress: () => handleButtonPress(button.onPress),
           }))}
-          onClose={modalConfig.buttons && modalConfig.buttons.length === 0 ? hideModal : undefined}
+          onClose={hideModal}
         />
       )}
     </ModalContext.Provider>

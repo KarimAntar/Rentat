@@ -172,17 +172,20 @@ service cloud.firestore {
     
     // Notifications collection
     match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() &&
         isOwner(resource.data.userId);
-      
-      allow create: if isAdmin(); // Only system can create notifications
-      
-      allow update: if isAuthenticated() && 
+
+      allow create: if isAdmin() || // Only system can create notifications
+        // Allow moderation system to create admin notifications
+        (request.resource.data.type in ['moderation_alert', 'dispute_alert'] &&
+         exists(/databases/$(database)/documents/admins/$(request.resource.data.userId)));
+
+      allow update: if isAuthenticated() &&
         isOwner(resource.data.userId) &&
         // Users can only update status and readAt
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readAt']);
-      
-      allow delete: if isAuthenticated() && 
+
+      allow delete: if isAuthenticated() &&
         (isOwner(resource.data.userId) || isAdmin());
     }
     

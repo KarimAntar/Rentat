@@ -584,6 +584,248 @@ export const onRentalUpdated = onDocumentUpdated('rentals/{rentalId}', async (ev
   }
 });
 
+// Trigger when a notification campaign is created or updated
+export const onNotificationCampaignCreated = onDocumentCreated('notification_campaigns/{campaignId}', async (event) => {
+  const campaign = event.data?.data();
+  if (!campaign) return;
+
+  try {
+    const campaignId = event.params.campaignId;
+
+    // Only process if status is 'sending' (immediate campaigns)
+    if (campaign.status !== 'sending') return;
+
+    await processNotificationCampaign(campaignId, campaign);
+  } catch (error) {
+    console.error('Error processing notification campaign creation:', error);
+  }
+});
+
+export const onNotificationCampaignUpdated = onDocumentUpdated('notification_campaigns/{campaignId}', async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+
+  if (!before || !after) return;
+
+  try {
+    const campaignId = event.params.campaignId;
+
+    // Only process if status changed to 'sending' or 'scheduled' campaigns become due
+    if (before.status === after.status) return;
+
+    if (after.status === 'sending') {
+      await processNotificationCampaign(campaignId, after);
+    }
+  } catch (error) {
+    console.error('Error processing notification campaign update:', error);
+  }
+});
+
+// Scheduled function to check for due campaigns (runs every 5 minutes)
+export const checkScheduledCampaigns = onCall(async () => {
+  try {
+    const now = admin.firestore.Timestamp.now();
+    const campaignsRef = db.collection('notification_campaigns');
+
+    // Find campaigns that are scheduled and due
+    const dueCampaigns = await campaignsRef
+      .where('status', '==', 'scheduled')
+      .where('scheduling.scheduledAt', '<=', now)
+      .get();
+
+    const processingPromises = dueCampaigns.docs.map(async (doc: any) => {
+      const campaign = doc.data();
+      const campaignId = doc.id;
+
+      // Update status to sending
+      await doc.ref.update({
+        status: 'sending',
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Process the campaign
+      await processNotificationCampaign(campaignId, { ...campaign, status: 'sending' });
+    });
+
+    await Promise.all(processingPromises);
+
+    return { processed: processingPromises.length };
+  } catch (error) {
+    console.error('Error checking scheduled campaigns:', error);
+    throw new HttpsError('internal', 'Failed to check scheduled campaigns');
+  }
+});
+
+// Function to process a notification campaign
+async function processNotificationCampaign(campaignId: string, campaign: any) {
+  try {
+    console.log(`Processing notification campaign: ${campaignId}`);
+
+    // Get target users based on audience criteria
+    const targetUsers = await getTargetUsers(campaign.targetAudience);
+
+    console.log(`Found ${targetUsers.length} target users for campaign ${campaignId}`);
+
+    // Update campaign stats with target count
+    await db.collection('notification_campaigns').doc(campaignId).update({
+      'stats.targetUsers': targetUsers.length,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send notifications in batches
+    const batchSize = 500; // FCM limit
+    let sent = 0;
+    let failed = 0;
+
+    for (let i = 0; i < targetUsers.length; i += batchSize) {
+      const batch = targetUsers.slice(i, i + batchSize);
+      const batchResults = await sendBatchNotifications(batch, campaign);
+
+      sent += batchResults.sent;
+      failed += batchResults.failed;
+
+      // Update progress
+      await db.collection('notification_campaigns').doc(campaignId).update({
+        'stats.sent': sent,
+        'stats.failed': failed,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Mark campaign as completed
+    await db.collection('notification_campaigns').doc(campaignId).update({
+      status: 'sent',
+      'stats.sent': sent,
+      'stats.failed': failed,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log(`Campaign ${campaignId} completed: ${sent} sent, ${failed} failed`);
+  } catch (error) {
+    console.error(`Error processing campaign ${campaignId}:`, error);
+
+    // Mark campaign as failed
+    await db.collection('notification_campaigns').doc(campaignId).update({
+      status: 'cancelled',
+      'stats.failed': admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+}
+
+// Function to get target users based on audience criteria
+async function getTargetUsers(audience: any): Promise<any[]> {
+  let query: any = db.collection('users');
+
+  if (audience.type === 'all') {
+    // Get all users with FCM tokens
+    query = query.where('fcmTokens', '!=', null);
+  } else if (audience.type === 'custom' && audience.filters) {
+    // Apply filters
+    for (const filter of audience.filters) {
+      switch (filter.field) {
+        case 'verified':
+          if (filter.operator === 'equals') {
+            query = query.where('verification.isVerified', '==', filter.value);
+          }
+          break;
+        case 'location':
+          if (filter.operator === 'equals') {
+            query = query.where('location.governorate', '==', filter.value);
+          }
+          break;
+        // Add more filters as needed
+      }
+    }
+  }
+
+  const snapshot = await query.get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+// Function to send batch notifications
+async function sendBatchNotifications(users: any[], campaign: any) {
+  const tokens: string[] = [];
+  const notifications: any[] = [];
+
+  // Collect all FCM tokens and prepare notifications
+  for (const user of users) {
+    if (user.fcmTokens && Array.isArray(user.fcmTokens)) {
+      tokens.push(...user.fcmTokens);
+
+      // Create notification document for each user
+      notifications.push({
+        userId: user.id,
+        type: 'campaign',
+        title: campaign.title,
+        body: campaign.message,
+        data: {
+          campaignId: campaign.id,
+          type: 'campaign',
+        },
+        status: 'unread',
+        delivery: {
+          push: { sent: false },
+        },
+        priority: 'normal',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  if (tokens.length > 0) {
+    // Send FCM multicast message
+    const message = {
+      notification: {
+        title: campaign.title,
+        body: campaign.message,
+        ...(campaign.imageUrl && { imageUrl: campaign.imageUrl }),
+      },
+      data: {
+        campaignId: campaign.id,
+        type: 'campaign',
+        click_action: 'FLUTTER_NOTIFICATION_CLICK',
+      },
+      tokens: tokens,
+    };
+
+    try {
+      const response = await admin.messaging().sendMulticast(message);
+      sent = response.successCount;
+      failed = response.failureCount;
+
+      console.log(`FCM batch sent: ${sent} success, ${failed} failed`);
+
+      // Log failures for debugging
+      if (response.responses) {
+        response.responses.forEach((resp, index) => {
+          if (!resp.success) {
+            console.error(`FCM failure for token ${index}:`, resp.error);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('FCM send error:', error);
+      failed = tokens.length;
+    }
+  }
+
+  // Create notification documents in batch
+  if (notifications.length > 0) {
+    const batch = db.batch();
+    notifications.forEach(notification => {
+      const ref = db.collection('notifications').doc();
+      batch.set(ref, notification);
+    });
+    await batch.commit();
+  }
+
+  return { sent, failed };
+}
+
 // Trigger when a new chat message is created
 export const onMessageCreated = onDocumentCreated('chats/{chatId}/messages/{messageId}', async (event) => {
   const message = event.data?.data();

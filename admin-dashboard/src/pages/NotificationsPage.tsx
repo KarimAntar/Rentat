@@ -325,7 +325,7 @@ export const NotificationsPage: React.FC = () => {
                       size="small"
                       onClick={() => handleDeleteCampaign(campaign.id)}
                       color="error"
-                      disabled={campaign.status === 'sending'}
+                      disabled={campaign.status === 'sending' && campaign.stats.sent === 0}
                     >
                       <Delete />
                     </IconButton>
