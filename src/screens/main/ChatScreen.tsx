@@ -45,6 +45,7 @@ const ChatScreen: React.FC = () => {
   const [otherUser, setOtherUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [messageUnsubscribe, setMessageUnsubscribe] = useState<(() => void) | null>(null);
 
   // Modal states
   const [reportUserModalVisible, setReportUserModalVisible] = useState(false);
@@ -56,6 +57,15 @@ const ChatScreen: React.FC = () => {
   useEffect(() => {
     initializeChat();
   }, []);
+
+  // Cleanup subscription when component unmounts or chat changes
+  useEffect(() => {
+    return () => {
+      if (messageUnsubscribe) {
+        messageUnsubscribe();
+      }
+    };
+  }, [messageUnsubscribe]);
 
   // State to track if we should scroll to bottom
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(false);
@@ -169,8 +179,8 @@ const ChatScreen: React.FC = () => {
           // Trigger scroll to bottom when messages are loaded
           setShouldScrollToBottom(true);
         });
+        setMessageUnsubscribe(() => unsubscribe);
         await ChatService.markAsRead(existingChat.id, user.uid);
-        return () => unsubscribe();
       } else {
         // Create placeholder chat for UI display only - no Firestore subscription
         setChat({
@@ -249,7 +259,7 @@ const ChatScreen: React.FC = () => {
         });
 
         await ChatService.markAsRead(realChat.id, user.uid);
-        return () => unsubscribe();
+        setMessageUnsubscribe(() => unsubscribe);
       } else {
         await ChatService.sendMessage({
           chatId: chat.id,
