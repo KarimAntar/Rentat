@@ -20,7 +20,7 @@ service cloud.firestore {
     }
     
     function isParticipant(participants) {
-      return request.auth.uid in participants;
+      return participants.hasAny([request.auth.uid]);
     }
     
     // Users collection
