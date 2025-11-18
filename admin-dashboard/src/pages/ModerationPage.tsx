@@ -15,8 +15,15 @@ import {
   Grid,
   Avatar,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  ImageList,
+  ImageListItem,
+  IconButton,
 } from '@mui/material';
-import { Cancel, Visibility, Block } from '@mui/icons-material';
+import { Cancel, Visibility, Block, Close } from '@mui/icons-material';
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -39,6 +46,8 @@ export const ModerationPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ModerationItem | null>(null);
 
   useEffect(() => {
     fetchModerationItems();
@@ -140,9 +149,16 @@ export const ModerationPage: React.FC = () => {
     }
   };
 
+  const handlePreviewItem = (item: ModerationItem) => {
+    setSelectedItem(item);
+    setPreviewModalOpen(true);
+  };
+
   const handleViewItem = (itemId: string) => {
-    // Open item in new tab - assuming the app is running on localhost:3000 or similar
-    const itemUrl = `${window.location.origin}/item/${itemId}`;
+    // Open item in main app - assuming the main app is running on localhost:3000
+    // In production, this would be the main app's domain
+    const mainAppUrl = window.location.origin.replace(':5173', ':3000'); // Assuming admin dashboard is on 5173 and main app on 3000
+    const itemUrl = `${mainAppUrl}/item/${itemId}`;
     window.open(itemUrl, '_blank');
   };
 
@@ -220,14 +236,23 @@ export const ModerationPage: React.FC = () => {
                 </CardContent>
                 <CardActions>
                   {item.type === 'item' && (
-                    <Button
-                      size="small"
-                      startIcon={<Visibility />}
-                      onClick={() => handleViewItem(item.targetId)}
-                      sx={{ mr: 'auto' }}
-                    >
-                      View Item
-                    </Button>
+                    <>
+                      <Button
+                        size="small"
+                        startIcon={<Visibility />}
+                        onClick={() => handlePreviewItem(item)}
+                        sx={{ mr: 1 }}
+                      >
+                        Preview
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() => handleViewItem(item.targetId)}
+                        sx={{ mr: 'auto' }}
+                      >
+                        View in App
+                      </Button>
+                    </>
                   )}
                   <Button
                     size="small"
@@ -260,6 +285,147 @@ export const ModerationPage: React.FC = () => {
           )}
         </Grid>
       )}
+
+      {/* Item Preview Modal */}
+      <Dialog
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6">Item Preview</Typography>
+          <IconButton onClick={() => setPreviewModalOpen(false)}>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {selectedItem && selectedItem.itemData && (
+            <Box>
+              {/* Item Images */}
+              {selectedItem.itemData.images && selectedItem.itemData.images.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <ImageList variant="masonry" cols={3} gap={8}>
+                    {selectedItem.itemData.images.map((image: string, index: number) => (
+                      <ImageListItem key={index}>
+                        <img
+                          src={image}
+                          alt={`Item image ${index + 1}`}
+                          loading="lazy"
+                          style={{ borderRadius: 8, width: '100%', height: 'auto' }}
+                        />
+                      </ImageListItem>
+                    ))}
+                  </ImageList>
+                </Box>
+              )}
+
+              {/* Item Details */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h5" sx={{ mb: 2 }}>
+                  {selectedItem.itemData.title || 'Untitled Item'}
+                </Typography>
+
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedItem.itemData.description || 'No description available'}
+                </Typography>
+
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <Chip
+                    label={`$${selectedItem.itemData.price || 0}`}
+                    color="primary"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={selectedItem.itemData.category || 'Uncategorized'}
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={selectedItem.itemData.condition || 'Unknown'}
+                    variant="outlined"
+                  />
+                </Box>
+
+                {selectedItem.itemData.location && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    📍 {selectedItem.itemData.location}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Owner Information */}
+              {selectedItem.userData && (
+                <Box sx={{ display: 'flex', alignItems: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Avatar
+                    src={selectedItem.userData.photoURL}
+                    sx={{ width: 40, height: 40, mr: 2 }}
+                  >
+                    {selectedItem.userData.displayName?.[0] || selectedItem.userData.email?.[0] || 'U'}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="subtitle1">
+                      {selectedItem.userData.displayName || 'Unknown User'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {selectedItem.userData.email}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
+              {/* Report Information */}
+              <Box sx={{ mt: 3, p: 2, bgcolor: 'error.50', borderRadius: 1 }}>
+                <Typography variant="subtitle2" color="error" sx={{ mb: 1 }}>
+                  Report Details
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  <strong>Reason:</strong> {selectedItem.reason.replace(/_/g, ' ')}
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 1 }}>
+                  <strong>Reported:</strong> {selectedItem.createdAt.toLocaleString()}
+                </Typography>
+                {selectedItem.content?.description && (
+                  <Typography variant="body2">
+                    <strong>Description:</strong> "{selectedItem.content.description}"
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreviewModalOpen(false)}>Close</Button>
+          {selectedItem && (
+            <>
+              <Button
+                onClick={() => handleViewItem(selectedItem.targetId)}
+                variant="outlined"
+              >
+                View in App
+              </Button>
+              <Button
+                onClick={() => {
+                  handleSuspendItem(selectedItem.id, selectedItem.targetId);
+                  setPreviewModalOpen(false);
+                }}
+                color="error"
+                variant="contained"
+              >
+                Suspend Item
+              </Button>
+              <Button
+                onClick={() => {
+                  handleDismissReport(selectedItem.id);
+                  setPreviewModalOpen(false);
+                }}
+                color="inherit"
+              >
+                Dismiss Report
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
