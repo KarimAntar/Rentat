@@ -23,7 +23,7 @@ import {
   ImageListItem,
   IconButton,
 } from '@mui/material';
-import { Cancel, Visibility, Block, Close } from '@mui/icons-material';
+import { Cancel, Visibility, Block, Close, Image as ImageIcon } from '@mui/icons-material';
 import { collection, getDocs, query, where, orderBy, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -203,12 +203,23 @@ export const ModerationPage: React.FC = () => {
 
                   {item.type === 'item' && item.itemData && (
                     <>
-                      <Typography variant="h6" sx={{ mb: 1 }}>
-                        {item.itemData.title || 'Untitled Item'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        {item.itemData.description || 'No description available'}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
+                        <Avatar
+                          variant="rounded"
+                          src={item.itemData.images?.[0]}
+                          sx={{ width: 60, height: 60, mr: 2 }}
+                        >
+                          <ImageIcon sx={{ fontSize: 30, color: 'grey.400' }} />
+                        </Avatar>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="h6" sx={{ mb: 1 }}>
+                            {item.itemData.title || 'Untitled Item'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            {item.itemData.description || 'No description available'}
+                          </Typography>
+                        </Box>
+                      </Box>
 
                       {item.userData && (
                         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
