@@ -12,6 +12,7 @@ import {
   Modal,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,7 @@ import { getGovernorateById } from '../../data/governorates';
 import { searchService, SearchResult, SearchSuggestion, SearchFilters } from '../../services/search';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useUserProfile } from '../../services/userProfile';
+import { locationService } from '../../services/location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
@@ -56,6 +58,8 @@ const SearchScreen: React.FC = () => {
   const [filters, setFilters] = useState<Partial<SearchFilters>>({
     sortBy: 'relevance',
   });
+
+
 
   // Load trending searches, recent searches, and favorites on mount
   useEffect(() => {
@@ -557,10 +561,6 @@ const SearchScreen: React.FC = () => {
         <Text style={styles.resultsCount}>
           {loading ? 'Searching...' : `${items.length} items found`}
         </Text>
-        <TouchableOpacity style={styles.sortButton}>
-          <Text style={styles.sortText}>Sort by</Text>
-          <Ionicons name="chevron-down" size={16} color="#6B7280" />
-        </TouchableOpacity>
       </View>
 
       {/* Items List */}
@@ -686,14 +686,20 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
   },
-  sortButton: {
+  headerActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
-  sortText: {
-    fontSize: 14,
-    color: '#6B7280',
+  viewToggle: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewToggleActive: {
+    backgroundColor: '#F0F9FF',
   },
   listContainer: {
     padding: 16,
@@ -1075,6 +1081,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
   },
+
 });
 
 export default SearchScreen;

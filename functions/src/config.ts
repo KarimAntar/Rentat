@@ -58,4 +58,8 @@ export const config = {
     webhookSecret: (process.env as any).DIDIT_WEBHOOK_SECRET || '',
     webhookUrl: (process.env as any).DIDIT_WEBHOOK_URL || '',
   },
+  vapid: {
+    privateKey: (process.env as any).VAPID_PRIVATE_KEY || '',
+    publicKey: 'BNpXrmVCfvQX3dzGCISIdhK9MpyMXJvCtg78HBuPTMr0pGYwf_bhclLruhCyPhVavkMUXgfRuT25ElvL5Au4CsA',
+  },
 };

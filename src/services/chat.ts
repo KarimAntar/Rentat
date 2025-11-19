@@ -83,6 +83,7 @@ const mapMessageDoc = (id: string, data: any): Message => {
       sent: toDate(data.status?.sent) as Date,
       delivered: toDate(data.status?.delivered),
       read: toDate(data.status?.read),
+      readBy: data.status?.readBy || [],
     },
     metadata: data.metadata,
     timestamp: toDate(data.timestamp) as Date,
@@ -234,7 +235,10 @@ export class ChatService {
         });
         callback(sortedMsgs);
       },
-      (err) => console.error('subscribeToMessages error:', err)
+      (err) => {
+        console.error('subscribeToMessages error:', err);
+        throw err;
+      }
     );
   }
 
@@ -251,6 +255,7 @@ export class ChatService {
       status: {
         sent: serverTimestamp(),
         delivered: serverTimestamp(), // Mark as delivered immediately for all recipients
+        readBy: [senderId], // Sender has read their own message
       },
       timestamp: serverTimestamp(),
     });
@@ -297,15 +302,22 @@ export class ChatService {
 
     // Mark all messages as read for this user (permanent, WhatsApp-style)
     const msgsRef = collection(db, CHATS, chatId, 'messages');
-    const q = query(msgsRef, where('senderId', '!=', userId));
+    // Fix: Only update messages not sent by user AND not already in readBy
+    const q = query(msgsRef);
     const snap = await getDocs(q);
-    const now = new Date();
+    
     for (const docSnap of snap.docs) {
       const msgData = docSnap.data();
-      // Only update if not already marked as read
-      if (!msgData.status?.read) {
+      
+      if (msgData.senderId === userId) {
+        continue; // Don't mark own messages as read
+      }
+      
+      const readBy: string[] = msgData.status?.readBy || [];
+      if (!readBy.includes(userId)) {
         await updateDoc(doc(msgsRef, docSnap.id), {
-          'status.read': serverTimestamp(),
+          'status.readBy': [...readBy, userId],
+          'status.read': serverTimestamp(), // Optionally update legacy field for compatibility
         });
       }
     }

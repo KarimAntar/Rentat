@@ -104,23 +104,33 @@ service cloud.firestore {
 
       allow update: if isAuthenticated() &&
         request.auth.uid in resource.data.participants &&
-        // Only allow updating lastMessage and metadata
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'metadata', 'updatedAt', 'participantsKey']);
+        // Only allow updating lastMessage, metadata, participants, and participantsKey
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'metadata', 'updatedAt', 'participants', 'participantsKey']);
 
       allow delete: if isAuthenticated() &&
         request.auth.uid in resource.data.participants;
 
       // Messages subcollection
       match /messages/{messageId} {
-        allow read: if isAuthenticated(); // Allow all authenticated users to read messages
+        allow read: if isAuthenticated() &&
+          exists(/databases/$(database)/documents/chats/$(chatId)) &&
+          request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
 
         allow create: if isAuthenticated() &&
           request.resource.data.senderId == request.auth.uid;
 
-        allow update: if isAuthenticated() &&
-          isOwner(resource.data.senderId) &&
-          // Only allow updating status and metadata (for editing/deleting)
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'metadata']);
+        allow update: if isAuthenticated() && (
+          // Message sender can update status and metadata (for editing/deleting)
+          (isOwner(resource.data.senderId) &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'metadata'])) ||
+          // Chat participants can update read status (add themselves to readBy array)
+          (exists(/databases/$(database)/documents/chats/$(chatId)) &&
+           request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+           // Ensure they're only adding their own UID to readBy array
+           request.resource.data.status.readBy.hasAll(resource.data.status.readBy) &&
+           request.resource.data.status.readBy.hasAny([request.auth.uid]))
+        );
 
         allow delete: if isAuthenticated() &&
           (isOwner(resource.data.senderId) || isAdmin());

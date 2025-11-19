@@ -212,7 +212,16 @@ const RentalHistoryScreen: React.FC = () => {
 
               {rental.status === 'completed' && (
                 <View style={styles.rentalActions}>
-                  <TouchableOpacity style={styles.actionButton}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => {
+                      const reviewType = rental.ownerId === user?.uid ? 'owner-to-renter' : 'renter-to-owner';
+                      (navigation as any).navigate('Review', {
+                        rentalId: rental.id,
+                        reviewType,
+                      });
+                    }}
+                  >
                     <Ionicons name="star-outline" size={16} color="#4639eb" />
                     <Text style={styles.actionButtonText}>Leave Review</Text>
                   </TouchableOpacity>

@@ -57,6 +57,18 @@ DIDIT_WEBHOOK_SECRET=your_webhook_secret
 DIDIT_WEBHOOK_URL=your_webhook_url
 ```
 
+### Web Push Notifications (VAPID Keys)
+```
+VAPID_PRIVATE_KEY=your_vapid_private_key
+```
+
+**Note:** The VAPID public key is stored in `app.json` under `expo.notification.vapidPublicKey`. The private key should only be accessible server-side for sending push notifications.
+
+To generate VAPID keys:
+```bash
+npx web-push generate-vapid-keys
+```
+
 ### Stripe Configuration (Deprecated - kept for reference)
 ```
 STRIPE_SECRET_KEY=your_stripe_secret_key

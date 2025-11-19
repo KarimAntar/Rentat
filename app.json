@@ -102,7 +102,8 @@
       "icon": "./assets/notification-icon.png",
       "color": "#4639eb",
       "androidMode": "default",
-      "androidCollapsedTitle": "New notification from Rentat"
+      "androidCollapsedTitle": "New notification from Rentat",
+      "vapidPublicKey": "BNpXrmVCfvQX3dzGCISIdhK9MpyMXJvCtg78HBuPTMr0pGYwf_bhclLruhCyPhVavkMUXgfRuT25ElvL5Au4CsA"
     },
     "updates": {
       "fallbackToCacheTimeout": 0,

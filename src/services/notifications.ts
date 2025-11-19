@@ -56,10 +56,12 @@ export class NotificationService {
       // Set up listeners
       this.setupNotificationListeners();
 
-      // Handle notification that opened the app
-      const lastNotificationResponse = await Notifications.getLastNotificationResponseAsync();
-      if (lastNotificationResponse) {
-        this.handleNotificationResponse(lastNotificationResponse);
+      // Handle notification that opened the app (not available on web)
+      if (Platform.OS !== 'web') {
+        const lastNotificationResponse = await Notifications.getLastNotificationResponseAsync();
+        if (lastNotificationResponse) {
+          this.handleNotificationResponse(lastNotificationResponse);
+        }
       }
     } catch (error) {
       console.error('Error initializing notification service:', error);
@@ -153,6 +155,23 @@ export class NotificationService {
   // Get Expo push token
   public async getExpoPushToken(): Promise<string | null> {
     try {
+      // For web, skip device check and use VAPID key from config
+      if (Platform.OS === 'web') {
+        const vapidPublicKey = (Constants.expoConfig?.notification as any)?.vapidPublicKey;
+        if (!vapidPublicKey) {
+          console.warn('VAPID public key not configured for web push notifications');
+          return null;
+        }
+
+        const token = await Notifications.getExpoPushTokenAsync({
+          projectId: Constants.expoConfig?.extra?.eas?.projectId,
+        });
+
+        this.currentToken = token.data;
+        return token.data;
+      }
+
+      // For native platforms, check if it's a physical device
       if (!Constants.isDevice) {
         console.warn('Push notifications only work on physical devices');
         return null;

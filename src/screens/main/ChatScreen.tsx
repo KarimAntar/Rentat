@@ -63,8 +63,10 @@ const ChatScreen: React.FC = () => {
       document.documentElement.scrollTop = document.body.scrollHeight;
       document.body.scrollTop = document.body.scrollHeight;
     }
-    initializeChat();
-  }, []);
+    if (user) {
+      initializeChat();
+    }
+  }, [user]);
 
   // Cleanup subscription when component unmounts or chat changes
   useEffect(() => {
@@ -157,30 +159,20 @@ const ChatScreen: React.FC = () => {
         setChat(existingChat);
         // Subscribe to messages only for real chat documents
         const unsubscribe = ChatService.subscribeToMessages(existingChat.id, (msgs) => {
-          // Mark messages from other users as read locally when chat is opened
-          const updatedMsgs = msgs.map(m => {
-            if (m.senderId !== user.uid && !m.status?.read) {
-              return {
-                ...m,
-                status: {
-                  ...m.status,
-                  read: new Date(),
-                }
-              };
-            }
-            return m;
-          });
           setMessages(
-            updatedMsgs.map(m => ({
+            msgs.map(m => ({
               ...m,
               senderName: m.senderId === user.uid ? (user.displayName || 'You') : 'User',
               senderAvatar: (m.senderId === user.uid ? user.photoURL : undefined) || undefined,
             }))
           );
+          // Always update chat metadata to trigger indicator refresh
+          setChat(prev => prev ? { ...prev, metadata: { ...existingChat.metadata } } : prev);
           // Trigger scroll to bottom when messages are loaded
           setShouldScrollToBottom(true);
         });
         setMessageUnsubscribe(() => unsubscribe);
+        // Mark messages as read only once when opening the chat
         await ChatService.markAsRead(existingChat.id, user.uid);
       } else {
         // Create placeholder chat for UI display only - no Firestore subscription
@@ -203,11 +195,12 @@ const ChatScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error initializing chat:', error);
-      showModal({
-        title: 'Error',
-        message: 'Failed to load chat',
-        type: 'error',
-      });
+      // Temporarily suppress modal error for permission issues
+      // showModal({
+      //   title: 'Error',
+      //   message: 'Failed to load chat',
+      //   type: 'error',
+      // });
     } finally {
       setLoading(false);
     }
@@ -383,7 +376,17 @@ const ChatScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {/* Fixed Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => {
+            // Always navigate to Messages screen
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              (navigation as any).navigate('Main', { screen: 'Messages' });
+            }
+          }}
+        >
           <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
         <Image
@@ -426,17 +429,21 @@ const ChatScreen: React.FC = () => {
       {messages.map((msg, index) => {
         const isMyMessage = msg.senderId === user?.uid;
         const isLastMessage = index === messages.length - 1;
+        // WhatsApp-style: check if this message was read by the other participant
         const getMessageStatus = () => {
           if (!isMyMessage) return null;
-          if (msg.status?.read) {
-            return { icon: 'checkmark-done', color: '#FFFFFF', label: 'read' };
+          const otherUserId = chat?.participants.find(p => p !== user?.uid);
+
+          // Use same logic as MessagesScreen: show double check if readBy includes other user, else single check
+          if (
+            msg.status?.readBy &&
+            Array.isArray(msg.status.readBy) &&
+            otherUserId &&
+            msg.status.readBy.includes(otherUserId)
+          ) {
+            return { icon: 'checkmark-done-outline', color: '#FFFFFF', label: 'read' };
           }
-          // Only show single check for sent/delivered, never double unless read
-          if (msg.status?.delivered || msg.status?.sent) {
-            return { icon: 'checkmark', color: '#FFFFFF', label: 'sent' };
-          }
-          // For older messages without status, assume sent
-          return { icon: 'checkmark', color: '#FFFFFF', label: 'sent' };
+          return { icon: 'checkmark-outline', color: '#FFFFFF', label: 'sent' };
         };
 
         const status = getMessageStatus();

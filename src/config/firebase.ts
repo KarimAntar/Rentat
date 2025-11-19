@@ -64,11 +64,7 @@ try {
  * This ensures the app connects to the correct Firestore instance.
  */
 let db: Firestore;
-if (!__DEV__) {
-  db = initializeFirestore(app, { host: 'eur3-firestore.googleapis.com', ssl: true });
-} else {
-  db = getFirestore(app);
-}
+db = initializeFirestore(app, { host: 'eur3-firestore.googleapis.com', ssl: true });
 
 // Initialize Storage
 const storage: FirebaseStorage = getStorage(app);

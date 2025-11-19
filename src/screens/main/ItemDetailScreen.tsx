@@ -20,11 +20,13 @@ import { useAuthContext } from '../../contexts/AuthContext';
 import { useModal } from '../../contexts/ModalContext';
 import { authService } from '../../services/auth';
 import ChatService from '../../services/chat';
-import { Item, User } from '../../types';
+import { reviewService } from '../../services/reviews';
+import { Item, User, Review } from '../../types';
 import { getCategoryById } from '../../data/categories';
 import { getGovernorateById } from '../../data/governorates';
 import { moderationService, ReportReason } from '../../services/moderation';
 import ReportModal from '../../components/ui/ReportModal';
+import ImageGallery from '../../components/ImageGallery';
 
 
 const { width } = Dimensions.get('window');
@@ -38,12 +40,9 @@ const ItemDetailScreen: React.FC = () => {
 
   const [item, setItem] = useState<Item | null>(null);
   const [owner, setOwner] = useState<User | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [currentX, setCurrentX] = useState(0);
 
   // Modal state
   const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -51,6 +50,12 @@ const ItemDetailScreen: React.FC = () => {
   useEffect(() => {
     loadItem();
   }, [itemId]);
+
+  useEffect(() => {
+    if (owner?.uid) {
+      loadReviews();
+    }
+  }, [owner?.uid]);
 
   const loadItem = async () => {
     try {
@@ -280,6 +285,21 @@ const ItemDetailScreen: React.FC = () => {
     });
   };
 
+  const loadReviews = async () => {
+    if (!owner?.uid) return;
+
+    try {
+      const { reviews: ownerReviews } = await reviewService.getUserReviews(
+        owner.uid,
+        'renter-to-owner',
+        { limit: 3 }
+      );
+      setReviews(ownerReviews);
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+    }
+  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -343,182 +363,13 @@ const ItemDetailScreen: React.FC = () => {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollView} contentContainerStyle={{ paddingBottom: 120 }}>
-          <View style={[styles.imageContainer, Platform.OS === 'web' ? { marginTop: 24 } : {}]}>
-            {item.images && item.images.length > 0 ? (
-              Platform.OS === 'web' ? (
-                <div 
-                  style={{ position: 'relative', width: '100%', maxWidth: 600, margin: '0 auto', cursor: isDragging ? 'grabbing' : 'grab' }}
-                  onMouseDown={(e) => {
-                    setIsDragging(true);
-                    setStartX(e.clientX);
-                    setCurrentX(e.clientX);
-                  }}
-                  onMouseMove={(e) => {
-                    if (isDragging) {
-                      setCurrentX(e.clientX);
-                    }
-                  }}
-                  onMouseUp={() => {
-                    if (isDragging) {
-                      const diff = startX - currentX;
-                      const threshold = 50; // minimum drag distance to trigger swipe
-                      
-                      if (Math.abs(diff) > threshold) {
-                        if (diff > 0 && currentImageIndex < item.images.length - 1) {
-                          // Swiped left, go to next image
-                          setCurrentImageIndex(currentImageIndex + 1);
-                        } else if (diff < 0 && currentImageIndex > 0) {
-                          // Swiped right, go to previous image
-                          setCurrentImageIndex(currentImageIndex - 1);
-                        }
-                      }
-                      
-                      setIsDragging(false);
-                      setStartX(0);
-                      setCurrentX(0);
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    if (isDragging) {
-                      setIsDragging(false);
-                      setStartX(0);
-                      setCurrentX(0);
-                    }
-                  }}
-                >
-                  <img
-                    src={item.images[currentImageIndex]}
-                    alt={`item-${currentImageIndex}`}
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      aspectRatio: '1 / 1',
-                      objectFit: 'cover',
-                      borderRadius: 12,
-                      userSelect: 'none',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  {item.images.length > 1 && (
-                    <>
-                      <button
-                        style={{
-                          position: 'absolute',
-                          left: 8,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'rgba(255, 255, 255, 0.9)',
-                          border: '1px solid #4639eb',
-                          borderRadius: '50%',
-                          width: 40,
-                          height: 40,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          zIndex: 2,
-                          fontSize: 18,
-                          fontWeight: 'bold',
-                          color: '#4639eb',
-                        }}
-                        onClick={() => setCurrentImageIndex(i => Math.max(i - 1, 0))}
-                        disabled={currentImageIndex === 0}
-                      >
-                        ‹
-                      </button>
-                      <button
-                        style={{
-                          position: 'absolute',
-                          right: 8,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          background: 'rgba(255, 255, 255, 0.9)',
-                          border: '1px solid #4639eb',
-                          borderRadius: '50%',
-                          width: 40,
-                          height: 40,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          zIndex: 2,
-                          fontSize: 18,
-                          fontWeight: 'bold',
-                          color: '#4639eb',
-                        }}
-                        onClick={() => setCurrentImageIndex(i => Math.min(i + 1, item.images.length - 1))}
-                        disabled={currentImageIndex === item.images.length - 1}
-                      >
-                        ›
-                      </button>
-                      <div style={{
-                        position: 'absolute',
-                        bottom: 16,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        display: 'flex',
-                        gap: 8,
-                        zIndex: 2,
-                      }}>
-                        {item.images.map((_, index) => (
-                          <div
-                            key={index}
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 4,
-                              backgroundColor: currentImageIndex === index ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <View style={{ width, height: Math.round(width * 0.75) }}>
-                    <ScrollView
-                      horizontal
-                      pagingEnabled
-                      showsHorizontalScrollIndicator={false}
-                      style={{ width, height: Math.round(width * 0.75) }}
-                      contentContainerStyle={{ alignItems: 'center' }}
-                      onMomentumScrollEnd={(event) => {
-                        const index = Math.round(event.nativeEvent.contentOffset.x / width);
-                        setCurrentImageIndex(index);
-                      }}
-                    >
-                      {item.images.map((imageUrl, index) => (
-                        <Image
-                          key={index}
-                          source={{ uri: imageUrl }}
-                          style={{ width, height: Math.round(width * 0.75), resizeMode: 'cover', borderRadius: 12 }}
-                        />
-                      ))}
-                    </ScrollView>
-                  </View>
-                  {item.images.length > 1 && (
-                    <View style={styles.imageIndicators}>
-                      {item.images.map((_, index) => (
-                        <View
-                          key={index}
-                          style={[
-                            styles.indicator,
-                            currentImageIndex === index && styles.activeIndicator,
-                          ]}
-                        />
-                      ))}
-                    </View>
-                  )}
-                </>
-              )
-            ) : (
-              <View style={styles.placeholderImage}>
-                <Ionicons name="image" size={48} color="#D1D5DB" />
-                <Text style={styles.placeholderText}>No images available</Text>
-              </View>
-            )}
+          <View style={styles.imageContainer}>
+            <ImageGallery
+              images={item.images || []}
+              height={400}
+              thumbnailHeight={60}
+              showThumbnails={true}
+            />
           </View>
 
           <View style={styles.detailsContainer}>
@@ -561,7 +412,15 @@ const ItemDetailScreen: React.FC = () => {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Owner</Text>
-              <View style={styles.ownerInfo}>
+              <TouchableOpacity
+                style={styles.ownerInfo}
+                onPress={() => {
+                  if (owner?.uid && owner.uid !== user?.uid) {
+                    (navigation as any).navigate('PublicProfile', { userId: owner.uid });
+                  }
+                }}
+                disabled={!owner?.uid || owner.uid === user?.uid}
+              >
                 <Image
                   source={{
                     uri: owner?.photoURL || 'https://via.placeholder.com/48x48?text=U',
@@ -570,7 +429,7 @@ const ItemDetailScreen: React.FC = () => {
                 />
                 <View style={styles.ownerDetails}>
                   <View style={styles.ownerNameRow}>
-                    <Text style={styles.ownerName}>
+                    <Text style={[styles.ownerName, owner?.uid && owner.uid !== user?.uid ? styles.ownerNameClickable : null]}>
                       {owner?.displayName || (owner?.email ? owner.email.split('@')[0] : 'Owner')}
                     </Text>
                     {owner?.verification?.isVerified && (
@@ -611,7 +470,7 @@ const ItemDetailScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.section}>
@@ -663,6 +522,85 @@ const ItemDetailScreen: React.FC = () => {
                 ))}
               </View>
             )}
+
+            {/* Reviews Section */}
+            <View style={styles.section}>
+              <View style={styles.reviewsHeader}>
+                <Text style={styles.sectionTitle}>Reviews</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (owner?.uid) {
+                      (navigation as any).navigate('PublicProfile', { userId: owner.uid });
+                    }
+                  }}
+                >
+                  <Text style={styles.seeAllText}>See all</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.ratingSummary}>
+                <View style={styles.ratingStars}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={
+                        star <= Math.floor(owner?.ratings?.asOwner?.average || 0)
+                          ? 'star'
+                          : star - (owner?.ratings?.asOwner?.average || 0) < 1
+                          ? 'star-half'
+                          : 'star-outline'
+                      }
+                      size={20}
+                      color="#FFC107"
+                    />
+                  ))}
+                </View>
+                <Text style={styles.ratingText}>
+                  {owner?.ratings?.asOwner?.average?.toFixed(1) || '0.0'} ({owner?.ratings?.asOwner?.count || 0} reviews)
+                </Text>
+              </View>
+
+              {reviews.length > 0 ? (
+                <View style={styles.recentReviews}>
+                  {reviews.slice(0, 3).map((review) => (
+                    <View key={review.id} style={styles.reviewItem}>
+                      <View style={styles.reviewStars}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={
+                              star <= review.ratings.overall
+                                ? 'star'
+                                : star - review.ratings.overall < 1
+                                ? 'star-half'
+                                : 'star-outline'
+                            }
+                            size={14}
+                            color="#FFC107"
+                          />
+                        ))}
+                      </View>
+                      {review.review?.comment && (
+                        <Text style={styles.reviewComment} numberOfLines={2}>
+                          {review.review.comment}
+                        </Text>
+                      )}
+                      <Text style={styles.reviewDate}>
+                        {review.createdAt?.toLocaleDateString()}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.noReviewsContainer}>
+                  <Ionicons name="star-outline" size={32} color="#D1D5DB" />
+                  <Text style={styles.noReviewsText}>No reviews yet</Text>
+                  <Text style={styles.noReviewsSubtext}>
+                    Reviews will appear here after completed rentals
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -796,13 +734,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    backdropFilter: 'blur(10px)',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   headerActions: {
     flexDirection: 'row',
@@ -818,7 +752,6 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: 'relative',
-    marginTop: 60,
   },
   itemImage: {
     width: width,
@@ -970,6 +903,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
+  ownerNameClickable: {
+    color: '#4639eb',
+    textDecorationLine: 'underline',
+  },
   verificationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1095,6 +1032,73 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100,
+  },
+  reviewsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  seeAllText: {
+    fontSize: 14,
+    color: '#4639eb',
+    fontWeight: '500',
+  },
+  ratingSummary: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 8,
+  },
+  ratingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  recentReviews: {
+    gap: 12,
+  },
+  reviewItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  reviewStars: {
+    flexDirection: 'row',
+    gap: 2,
+    marginBottom: 8,
+  },
+  reviewComment: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  noReviewsContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  noReviewsText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  noReviewsSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 

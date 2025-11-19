@@ -386,6 +386,7 @@ export interface MessageStatus {
   sent: Date;
   delivered?: Date;
   read?: Date;
+  readBy?: string[]; // user IDs who have read this message
 }
 
 export interface MessageMetadata {

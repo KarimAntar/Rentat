@@ -98,8 +98,7 @@ const MessagesScreen: React.FC = () => {
           const itemTitle = item?.title || 'Item';
           const displayName = `${userFirstName} - ${itemTitle}`;
 
-          // Get unread count for current user (count only messages not sent by user)
-          // Fix: unreadCount should be the number of messages sent by others and not read by user
+          // Get unread count for current user (should be a single value, not doubled)
           let unreadCount = 0;
           if (chat.metadata?.unreadCount && typeof chat.metadata.unreadCount[user.uid] === 'number') {
             unreadCount = chat.metadata.unreadCount[user.uid];
@@ -289,29 +288,34 @@ const MessagesScreen: React.FC = () => {
           <View style={styles.messageContent}>
             <Text style={styles.lastMessage} numberOfLines={1}>
               {chat.lastMessage.text || 'No messages yet'}
+              {chat.lastMessage.senderId === user?.uid && (
+                <Text style={styles.messageStatusInline}>
+                  {(() => {
+                    // Only show seen indicator for the latest message sent by the user
+                    const otherUserId = chat.participants.find(p => p !== user.uid);
+                    // Only show for latest message sent by user in this chat
+                    const isLatestSent = chat.lastMessage.senderId === user.uid;
+                    if (!isLatestSent) return null;
+                    // Use unreadCount for other user as fallback, since lastMessage is not a Message object
+                    if (
+                      chat.metadata?.unreadCount &&
+                      typeof chat.metadata.unreadCount[otherUserId || ''] === 'number'
+                    ) {
+                      if (chat.metadata.unreadCount[otherUserId || ''] === 0) {
+                        return <Ionicons name="checkmark-done-outline" size={14} color="#4639eb" />;
+                      } else {
+                        return <Ionicons name="checkmark-outline" size={14} color="#6B7280" />;
+                      }
+                    }
+                    return null;
+                  })()}
+                </Text>
+              )}
             </Text>
-            {chat.lastMessage.senderId === user?.uid && (
-              <View style={styles.messageStatus}>
-                {(() => {
-                  // Check if this message was read by the other participant
-                  const otherUserId = chat.participants.find(p => p !== user.uid);
-                  // WhatsApp-style: check if last message was read by recipient (permanent)
-                  const lastMsgRead = chat.lastMessage.senderId === user.uid &&
-                    chat.lastMessage.text &&
-                    chat.metadata?.unreadCount?.[otherUserId || ''] === 0;
-
-                  if (lastMsgRead) {
-                    return <Ionicons name="checkmark-done-outline" size={14} color="#4639eb" />;
-                  } else {
-                    return <Ionicons name="checkmark-outline" size={14} color="#6B7280" />;
-                  }
-                })()}
-              </View>
+            {chat.unreadCount > 0 && (
+              <View style={styles.unreadIndicator} />
             )}
           </View>
-          {chat.unreadCount > 0 && (
-            <View style={styles.unreadIndicator} />
-          )}
         </View>
 
         {chat.otherUser?.verification?.isVerified && (
@@ -543,6 +547,12 @@ const styles = StyleSheet.create({
   },
   messageStatus: {
     marginLeft: 4,
+  },
+  messageStatusInline: {
+    marginLeft: 6,
+    marginRight: 0,
+    textAlignVertical: 'center',
+    includeFontPadding: false,
   },
   verificationBadge: {
     flexDirection: 'row',
