@@ -37,13 +37,11 @@ const MessagesScreen: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Subscribe to user's chats and listen for real-time updates
     const chatsQuery = query(
       collection(db, collections.chats),
       where('participants', 'array-contains', user.uid)
     );
 
-    // Listen for changes in all chats in real time, including unreadCount
     const unsubscribe = onSnapshot(chatsQuery, async (snapshot) => {
       try {
         const chatsData: ChatWithDetails[] = [];
@@ -68,13 +66,11 @@ const MessagesScreen: React.FC = () => {
             updatedAt: chatData.updatedAt?.toDate?.() || new Date(chatData.updatedAt || Date.now()),
           };
 
-          // Find the other participant
           const otherUserId = chat.participants.find(p => p !== user.uid);
           let otherUser: User | undefined;
           let item: Item | undefined;
 
           if (otherUserId) {
-            // Fetch other user data
             try {
               const userDoc = await fetchUserData(otherUserId);
               otherUser = userDoc;
@@ -84,7 +80,6 @@ const MessagesScreen: React.FC = () => {
           }
 
           if (chat.itemId) {
-            // Fetch item data
             try {
               const itemDoc = await fetchItemData(chat.itemId);
               item = itemDoc;
@@ -93,12 +88,10 @@ const MessagesScreen: React.FC = () => {
             }
           }
 
-          // Create display name: "[User First Name] + [Item Title]"
           const userFirstName = otherUser?.displayName?.split(' ')[0] || 'User';
           const itemTitle = item?.title || 'Item';
           const displayName = `${userFirstName} - ${itemTitle}`;
 
-          // Get unread count for current user (should be a single value, not doubled)
           let unreadCount = 0;
           if (chat.metadata?.unreadCount && typeof chat.metadata.unreadCount[user.uid] === 'number') {
             unreadCount = chat.metadata.unreadCount[user.uid];
@@ -114,7 +107,6 @@ const MessagesScreen: React.FC = () => {
           });
         }
 
-        // Sort chats by last message timestamp descending
         chatsData.sort((a, b) => {
           const aTime = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
           const bTime = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
@@ -218,12 +210,10 @@ const MessagesScreen: React.FC = () => {
   };
 
   const handleChatPress = (chat: ChatWithDetails) => {
-    // Double check: only mark as read if there are actually unread messages
     if (chat.unreadCount > 0) {
       ChatService.markAsRead(chat.id, user!.uid);
     }
 
-    // Navigate to chat
     const otherUserId = chat.participants.find(p => p !== user!.uid);
     const params: any = {
       chatId: chat.id,
@@ -291,12 +281,9 @@ const MessagesScreen: React.FC = () => {
               {chat.lastMessage.senderId === user?.uid && (
                 <Text style={styles.messageStatusInline}>
                   {(() => {
-                    // Only show seen indicator for the latest message sent by the user
                     const otherUserId = chat.participants.find(p => p !== user.uid);
-                    // Only show for latest message sent by user in this chat
                     const isLatestSent = chat.lastMessage.senderId === user.uid;
                     if (!isLatestSent) return null;
-                    // Use unreadCount for other user as fallback, since lastMessage is not a Message object
                     if (
                       chat.metadata?.unreadCount &&
                       typeof chat.metadata.unreadCount[otherUserId || ''] === 'number'
@@ -349,22 +336,8 @@ const MessagesScreen: React.FC = () => {
     );
   }
 
-  const handleStartNewChat = () => {
-    // Navigate to search screen to find items to chat about
-    (navigation as any).navigate('Search');
-  };
-
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.searchButton} onPress={handleStartNewChat}>
-            <Ionicons name="add-circle-outline" size={24} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {chats.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubble-outline" size={64} color="#D1D5DB" />
@@ -400,29 +373,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: '#6B7280',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'left',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  searchButton: {
-    padding: 8,
   },
   emptyContainer: {
     flex: 1,

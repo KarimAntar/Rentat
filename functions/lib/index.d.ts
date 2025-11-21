@@ -10,7 +10,7 @@ export declare const processRentalRequest: import("firebase-functions/v2/https")
         securityDeposit: any;
         deliveryFee: any;
         total: any;
-        currency: any;
+        currency: string;
     };
 }>, unknown>;
 export declare const processRentalResponse: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
@@ -39,3 +39,22 @@ export declare const onMessageCreated: import("firebase-functions/core").CloudFu
     chatId: string;
     messageId: string;
 }>>;
+export declare const confirmItemReceived: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+}>, unknown>;
+export declare const confirmItemReturned: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+}>, unknown>;
+export declare const refreshPaymentKey: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    paymentKey: string;
+    orderId: number;
+}>, unknown>;
+export declare const requestPayout: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    payoutRequestId: string;
+    estimatedProcessingTime: string;
+}>, unknown>;
+export declare const markAllNotificationsRead: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    updated: number;
+}>, unknown>;

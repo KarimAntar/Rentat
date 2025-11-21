@@ -40,21 +40,29 @@ export class NotificationService {
   // Initialize notification service
   public async initialize(): Promise<void> {
     try {
+      console.log('🔄 Initializing notification service...');
+
       // Request permissions
       const permission = await this.requestPermissions();
       if (!permission) {
-        console.warn('Notification permissions not granted');
+        console.warn('❌ Notification permissions not granted');
         return;
       }
+      console.log('✅ Notification permissions granted');
 
       // Get and register FCM token
       const token = await this.getExpoPushToken();
       if (token) {
+        console.log('📱 FCM token obtained:', token.substring(0, 20) + '...');
         await this.registerToken(token);
+        console.log('✅ FCM token registered with user');
+      } else {
+        console.warn('❌ No FCM token obtained');
       }
 
       // Set up listeners
       this.setupNotificationListeners();
+      console.log('✅ Notification listeners set up');
 
       // Handle notification that opened the app (not available on web)
       if (Platform.OS !== 'web') {
@@ -63,8 +71,10 @@ export class NotificationService {
           this.handleNotificationResponse(lastNotificationResponse);
         }
       }
+
+      console.log('🎉 Notification service initialized successfully');
     } catch (error) {
-      console.error('Error initializing notification service:', error);
+      console.error('❌ Error initializing notification service:', error);
     }
   }
 

@@ -14,18 +14,23 @@ export declare const collections: {
 };
 export declare const config: {
     paymob: {
-        apiKey: any;
-        integrationId: any;
-        hmacSecret: any;
+        apiKey: string;
+        integrationId: string;
+        hmacSecret: string;
+        secretKey: string;
     };
     stripe: {
-        secretKey: any;
-        webhookSecret: any;
+        secretKey: string;
+        webhookSecret: string;
     };
     didit: {
-        apiKey: any;
-        workflowId: any;
-        webhookSecret: any;
-        webhookUrl: any;
+        apiKey: string;
+        workflowId: string;
+        webhookSecret: string;
+        webhookUrl: string;
+    };
+    vapid: {
+        privateKey: string;
+        publicKey: string;
     };
 };

@@ -39,6 +39,17 @@
   },
   "functions": {
     "source": "functions",
-    "runtime": "nodejs20"
+    "runtime": "nodejs20",
+    "environmentVariables": {
+      "PAYMOB_API_KEY": "ZXlKaGJHY2lPaUpJVXpVeE1pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SmpiR0Z6Y3lJNklrMWxjbU5vWVc1MElpd2ljSEp2Wm1sc1pWOXdheUk2TVRBNU5qVTFOaXdpYm1GdFpTSTZJbWx1YVhScFlXd2lmUS5xbTZsd2RYdDhRRjZaY2pfRHhJWWlDbXd0alZzcjNjOW5ZOTEzdTJGVWZ2TnJ1NDA4YWNzclhnRm5nX0ZrUlNfM0Z1VFhtaHJ0YTM3QmFldExWZXFqQQ==",
+      "PAYMOB_INTEGRATION_ID": "5369141",
+      "PAYMOB_HMAC_SECRET": "CCABDAA0D728DD9BDDC0C37A2F0584CF",
+      "PAYMOB_SECRET_KEY": "egy_sk_test_f4544ea67865154cbc1be5f17a257bd53c768d429b768064fcef03e667ae5777",
+      "DIDIT_API_KEY": "arUslI6-aKMrMXKtExrHRbJiz-M4c4UcG8qK_EiIV9w",
+      "DIDIT_WORKFLOW_ID": "09461199-947d-4606-99c1-fffa7fd91efc",
+      "DIDIT_WEBHOOK_SECRET": "8TZs7WgdreX9ByygbyXEfhOA25FPZsnm7f_jURLStKY",
+      "DIDIT_WEBHOOK_URL": "https://webhooks-tfsivlyrrq-uc.a.run.app/didit-webhook",
+      "VAPID_PRIVATE_KEY": "Y_0M5d_fqo4DQHhTejig4rPwZhrGQA8HHsGuu5tsRgA"
+    }
   }
 }

@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { ItemService } from '../../services/firestore';
 import { Item } from '../../types';
+import TabHeader from '../../components/TabHeader';
 
 const MyListingsScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -101,16 +102,12 @@ const MyListingsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Listings</Text>
-        <TouchableOpacity onPress={() => (navigation as any).navigate('CreateItem')}>
-          <Ionicons name="add" size={24} color="#4639eb" />
-        </TouchableOpacity>
-      </View>
+      <TabHeader 
+        showGreeting={true}
+        showMessages={true}
+        showNotifications={true}
+        showSignOut={false}
+      />
 
       {/* Tabs */}
       <View style={styles.tabs}>
@@ -240,21 +237,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     marginTop: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
   },
   tabs: {
     flexDirection: 'row',

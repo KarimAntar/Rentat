@@ -11,7 +11,7 @@ import { UsersPage } from './pages/UsersPage';
 import { ItemsPage } from './pages/ItemsPage';
 import { RentalsPage } from './pages/RentalsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
-import { NotificationsPage } from './pages/NotificationsPage';
+import NotificationsPage from './pages/NotificationsPage';
 import { FeatureFlagsPage } from './pages/FeatureFlagsPage';
 import { DisputesPage } from './pages/DisputesPage';
 import { ModerationPage } from './pages/ModerationPage';

@@ -17,10 +17,16 @@ const UserGreeting: React.FC<UserGreetingProps> = ({
 }) => {
   const { user } = useAuthContext();
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
 
   useEffect(() => {
     checkVerificationStatus();
   }, [user]);
+
+  useEffect(() => {
+    // Reset image error flag when photoURL changes (so new uploads / urls retry)
+    setImgFailed(false);
+  }, [user?.photoURL]);
 
   const checkVerificationStatus = async () => {
     if (!user) return;
@@ -54,7 +60,7 @@ const UserGreeting: React.FC<UserGreetingProps> = ({
   return (
     <View style={styles.greetingWithAvatar}>
       <View style={styles.avatarContainer}>
-        {user?.photoURL ? (
+        {user?.photoURL && !imgFailed ? (
           <Image
             source={{ uri: user.photoURL }}
             style={[
@@ -62,6 +68,12 @@ const UserGreeting: React.FC<UserGreetingProps> = ({
               { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
               isVerified && styles.verifiedAvatar
             ]}
+            // If the remote avatar fails (rate limit / 429), fall back to default UI
+            onError={() => {
+              console.warn('User avatar failed to load, falling back to placeholder');
+              setImgFailed(true);
+            }}
+            accessibilityLabel="User avatar"
           />
         ) : (
           <View

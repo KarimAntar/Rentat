@@ -4,9 +4,15 @@ import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/fire
 import { setGlobalOptions } from 'firebase-functions/v2';
 import express from 'express';
 import cors from 'cors';
-import Stripe from 'stripe';
 import { initializeFirebaseAdmin, getFirestore, config } from './config';
 import { diditKycService } from './services/diditKyc';
+import PaymobFunctionsService from './services/paymob';
+
+const paymob = PaymobFunctionsService.initialize({
+  apiKey: config.paymob.apiKey,
+  integrationId: config.paymob.integrationId,
+  hmacSecret: config.paymob.hmacSecret,
+});
 
 // Didit API Configuration
 const DIDIT_API_BASE_URL = 'https://verification.didit.me/v2';
@@ -23,33 +29,293 @@ setGlobalOptions({
 
 // Initialize services
 const db = getFirestore();
-const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: '2023-10-16',
-});
 
 // Express app for webhook endpoints
 const app = express();
 app.use(cors({ origin: true }));
 
-// Stripe webhook endpoint
-app.post('/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'] as string;
-  const endpointSecret = config.stripe.webhookSecret;
-
-  let event: Stripe.Event;
-
+/* Paymob webhook handler
+   - Verifies HMAC when provided
+   - Locates rental by payment.paymobOrderId
+   - Marks rental payment status succeeded/failed and updates timeline
+   - Creates wallet transaction on success & sends notifications
+*/
+app.post('/paymob-webhook', express.json(), async (req, res) => {
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-  } catch (err: any) {
-    console.log(`Webhook signature verification failed.`, err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
+    const payload = req.body || {};
+    // Try common header names used by Paymob callbacks
+    const receivedHmac =
+      (req.headers['x-paymob-hmac'] as string) ||
+      (req.headers['x-callback-hmac'] as string) ||
+      (req.headers['x-paymob-signature'] as string) ||
+      (req.headers['x-hmac'] as string) ||
+      (payload.hmac as string) ||
+      '';
 
-  try {
-    await handleStripeWebhook(event);
+    // If an HMAC was provided, verify it
+    if (receivedHmac) {
+      const valid = paymob.verifyHMAC(payload, receivedHmac);
+      if (!valid) {
+        console.error('Paymob webhook: invalid HMAC signature');
+        return res.status(401).send('Invalid signature');
+      }
+    }
+
+    console.log('Received Paymob webhook payload:', JSON.stringify(payload));
+
+    // Paymob webhook payload structure: { type: "TRANSACTION", obj: { ...transactionData... } }
+    const tx = payload.obj || payload.transaction || payload || {};
+    const orderId = tx.order?.id || tx.order;
+
+    if (!orderId) {
+      console.warn('Paymob webhook: missing order id in payload');
+      return res.status(400).send('Missing order id');
+    }
+
+    // Find the rental that references this Paymob order id
+    const rentalsSnap = await db.collection('rentals').where('payment.paymobOrderId', '==', orderId).limit(1).get();
+
+    if (rentalsSnap.empty) {
+      console.warn('Paymob webhook: no rental found for order', orderId);
+      return res.json({ received: true });
+    }
+
+    const rentalDoc = rentalsSnap.docs[0];
+    const rentalRef = rentalDoc.ref;
+    const rental = rentalDoc.data() as any;
+
+    // Normalize transaction fields
+    const transactionId = tx.id || tx.transaction_id || tx._id;
+    const success = !!tx.success;
+    const pending = !!tx.pending;
+
+    if (success && !pending) {
+      // Payment succeeded
+      // CRITICAL BUG: If ownerId == renterId, they're renting their own item!
+      const isSelfRent = rental.ownerId === rental.renterId;
+      console.log('PAYMENT SUCCESS: Processing successful payment', {
+        rentalId: rentalRef.id,
+        paymobOrderId: orderId,
+        transactionId,
+        ownerId: rental.ownerId,
+        renterId: rental.renterId,
+        isSelfRent,
+        ISSUE_FOUND: isSelfRent ? 'OWNER AND RENTER ARE THE SAME PERSON - SELF-RENTAL!' : 'OWNER AND RENTER ARE DIFFERENT - CORRECT',
+        ACTION: isSelfRent ? 'Wallet will correctly credit the renter (who is also owner)' : 'Wallet will credit the owner'
+      });
+
+      if (isSelfRent) {
+        console.log('⚠️ SELF-RENTAL DETECTED: User rented their own item. Wallet credit is correct.');
+      }
+
+      await rentalRef.update({
+        'payment.paymentStatus': 'succeeded',
+        status: 'active',
+        'dates.actualStart': admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        timeline: admin.firestore.FieldValue.arrayUnion({
+          event: 'payment_completed',
+          timestamp: admin.firestore.Timestamp.now(),
+          actor: 'system',
+          details: { paymobTransactionId: transactionId, orderId },
+        }),
+      });
+
+      // Create wallet transactions: renter payment (negative) + owner credit
+      try {
+        const batch = db.batch();
+
+        // Renter transaction (debit)
+        const renterTxRef = db.collection('wallet_transactions').doc();
+        batch.set(renterTxRef, {
+          userId: rental.renterId,
+          type: 'rental_payment',
+          amount: -rental.pricing.total,
+          currency: rental.pricing.currency,
+          status: 'completed',
+          relatedRentalId: rentalRef.id,
+          relatedItemId: rental.itemId,
+          payment: {
+            paymobTransactionId: transactionId,
+            description: 'Payment for rental',
+          },
+          metadata: {
+            platformFee: rental.pricing.platformFee,
+            netAmount: -rental.pricing.total,
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Owner transaction (credit to wallet)
+        const ownerTxRef = db.collection('wallet_transactions').doc();
+        const ownerAmount = (rental.pricing.subtotal || 0) - (rental.pricing.platformFee || 0) + (rental.completion?.damageReported?.amount || 0);
+        batch.set(ownerTxRef, {
+          userId: rental.ownerId,
+          type: 'rental_income',
+          amount: ownerAmount,
+          currency: rental.pricing.currency,
+          status: 'completed',
+          relatedRentalId: rentalRef.id,
+          relatedItemId: rental.itemId,
+          payment: {
+            paymobTransactionId: transactionId,
+            description: 'Owner payout (credited to wallet)',
+          },
+          metadata: {
+            platformFee: rental.pricing.platformFee,
+            netAmount: ownerAmount,
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await batch.commit();
+
+        // CHECK BEFORE UPDATING - LOG OLD BALANCES
+        console.log('💰 WALLET BALANCE CHECK BEFORE PAYMENT PROCESSING:');
+
+        const [ownerBeforeDoc, renterBeforeDoc] = await Promise.all([
+          db.collection('users').doc(rental.ownerId).get(),
+          db.collection('users').doc(rental.renterId).get()
+        ]);
+
+        const ownerBeforeBalance = ownerBeforeDoc.data()?.wallet?.balance || 0;
+        const renterBeforeBalance = renterBeforeDoc.data()?.wallet?.balance || 0;
+
+        console.log('BALANCE BEFORE PAYMENT:', {
+          ownerId: rental.ownerId,
+          ownerBalanceBefore: ownerBeforeBalance,
+          renterId: rental.renterId,
+          renterBalanceBefore: renterBeforeBalance,
+          amountToCreditOwner: ownerAmount
+        });
+
+        // DOUBLE-CHECK WE'RE NOT CREDITING THE WRONG PERSON
+        if (rental.ownerId === rental.renterId) {
+          console.log('🤯 ERROR: ownerId equals renterId - this should not happen!');
+          console.log('Both owner and renter are the same user:', rental.ownerId);
+        } else {
+          console.log('✅ GOOD: Owner and renter are different users');
+        }
+
+        console.log('🚀 ATTEMPTING TO CREDIT OWNER WALLET:', {
+          updatingUserId: rental.ownerId,
+          addingAmount: ownerAmount,
+          rentalId: rentalRef.id,
+        });
+
+        // Update owner wallet balance (credit). Admin handles withdrawals later.
+        await db.collection('users').doc(rental.ownerId).update({
+          'wallet.balance': admin.firestore.FieldValue.increment(ownerAmount),
+          'wallet.totalEarnings': admin.firestore.FieldValue.increment(ownerAmount),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // VERIFY the wallet balance was updated (debug)
+        const ownerDocAfter = await db.collection('users').doc(rental.ownerId).get();
+        const ownerDataAfter = ownerDocAfter.data();
+
+        console.log('✅ OWNER WALLET SHOULD BE UPDATED:', {
+          ownerId: rental.ownerId,
+          balanceBefore: ownerBeforeBalance,
+          balanceAfterExpected: ownerBeforeBalance + ownerAmount,
+          balanceAfterActual: ownerDataAfter?.wallet?.balance,
+          earningsAfter: ownerDataAfter?.wallet?.totalEarnings,
+        });
+
+        // CRITICAL: Also check RENTER balance again to ensure it wasn't incorrectly modified
+        const renterDocAfterFinal = await db.collection('users').doc(rental.renterId).get();
+        const renterBalanceAfterFinal = renterDocAfterFinal.data()?.wallet?.balance || 0;
+
+        console.log('🚨 FINAL RENTER WALLET CHECK (should not have changed):', {
+          renterId: rental.renterId,
+          renterBalanceBefore: renterBeforeBalance,
+          renterBalanceAfter: renterBalanceAfterFinal,
+          renterBalanceChange: renterBalanceAfterFinal - renterBeforeBalance,
+          PROBLEM_DETECTED: renterBalanceAfterFinal !== renterBeforeBalance,
+          balanceDifference: renterBalanceAfterFinal - renterBeforeBalance
+        });
+
+        // Check if there are any other wallet updates happening concurrently
+        if (renterBalanceAfterFinal !== renterBeforeBalance) {
+          console.error('🚨 CRITICAL BUG: Renter balance changed when it should not have!');
+          console.log('This indicates there is another process incorrectly crediting the renter');
+
+          // Try to find the transaction that caused this
+          const recentRenterTransactions = await db.collection('wallet_transactions')
+            .where('userId', '==', rental.renterId)
+            .orderBy('createdAt', 'desc')
+            .limit(5)
+            .get();
+
+          console.log('Recent renter transactions (investigating the unexpected balance change):',
+            recentRenterTransactions.docs.map(doc => ({
+              id: doc.id,
+              type: doc.data().type,
+              amount: doc.data().amount,
+              createdAt: doc.data().createdAt
+            }))
+          );
+        }
+
+        // CHECK RENTER BALANCE DIDN'T CHANGE INCORRECTLY
+        const renterAfterDoc = await db.collection('users').doc(rental.renterId).get();
+        const renterAfterBalance = renterAfterDoc.data()?.wallet?.balance || 0;
+
+        console.log('🔍 RENTER WALLET VERIFICATION (should be unchanged):', {
+          renterId: rental.renterId,
+          balanceBefore: renterBeforeBalance,
+          balanceAfter: renterAfterBalance,
+          balanceChange: renterAfterBalance - renterBeforeBalance,
+          shouldBeZero: renterAfterBalance === renterBeforeBalance
+        });
+      } catch (err) {
+        console.error('Error creating wallet transactions after Paymob success:', err);
+      }
+
+      // Send notifications
+      await sendNotification(rental.renterId, {
+        type: 'payment',
+        title: 'Payment Successful',
+        body: 'Your rental payment has been processed successfully',
+        data: { rentalId: rentalRef.id, orderId },
+      });
+
+      await sendNotification(rental.ownerId, {
+        type: 'rental_confirmed',
+        title: 'Rental Confirmed',
+        body: 'Your item has been successfully rented',
+        data: { rentalId: rentalRef.id, orderId },
+      });
+    } else if (!success && !pending) {
+      // Payment failed (final)
+      await rentalRef.update({
+        'payment.paymentStatus': 'failed',
+        status: 'rejected',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        timeline: admin.firestore.FieldValue.arrayUnion({
+          event: 'payment_failed',
+          timestamp: admin.firestore.Timestamp.now(),
+          actor: 'system',
+          details: { paymobTransactionId: transactionId, orderId },
+        }),
+      });
+
+      await sendNotification(rental.renterId, {
+        type: 'payment',
+        title: 'Payment Failed',
+        body: 'Your rental payment could not be processed. Please try again.',
+        data: { rentalId: rentalRef.id, orderId },
+      });
+    } else {
+      // Pending or intermediate state — optionally log and return OK
+      console.log('Paymob webhook: transaction pending or intermediate state', { orderId, transactionId, pending, success });
+    }
+
     return res.json({ received: true });
   } catch (error) {
-    console.error('Error handling webhook:', error);
+    console.error('Error handling Paymob webhook:', error);
     return res.status(500).send('Webhook handler failed');
   }
 });
@@ -291,7 +557,7 @@ export const processRentalRequest = onCall(async (request) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       timeline: [{
         event: 'rental_requested',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: admin.firestore.Timestamp.now(),
         actor: auth.uid,
         details: { message },
       }],
@@ -368,8 +634,11 @@ export const processRentalRequest = onCall(async (request) => {
 
 // Rental approval/rejection
 export const processRentalResponse = onCall(async (request) => {
+  console.log('=== PROCESS RENTAL RESPONSE STARTED ===');
+  console.log('Function version with debug logging');
+
   const { auth, data } = request;
-  
+
   if (!auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -401,37 +670,82 @@ export const processRentalResponse = onCall(async (request) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       timeline: admin.firestore.FieldValue.arrayUnion({
         event: `rental_${action}d`,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: admin.firestore.Timestamp.now(),
         actor: auth.uid,
-        details: { message },
+        ...(message ? { details: { message } } : {}),
       }),
     };
 
     if (action === 'approve') {
       updateData['dates.confirmedStart'] = rental.dates.requestedStart;
       updateData['dates.confirmedEnd'] = rental.dates.requestedEnd;
-      
-      // Create Stripe payment intent
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(rental.pricing.total * 100), // Convert to cents
-        currency: rental.pricing.currency.toLowerCase(),
-        metadata: {
-          rentalId,
-          type: 'rental_payment',
-        },
-      });
 
-      updateData['payment.stripePaymentIntentId'] = paymentIntent.id;
-      updateData['payment.paymentStatus'] = 'pending';
+      // Validate rental pricing data
+      if (!rental.pricing || !rental.pricing.total) {
+        console.error('Invalid rental pricing data:', rental.pricing);
+        throw new HttpsError('failed-precondition', 'Rental pricing data is invalid');
+      }
+
+      // Ensure currency is always EGP (fix for existing rentals with invalid currency)
+      const currency = 'EGP';
+
+      // Debug: Log environment variables
+      console.log('Environment variables check:');
+      console.log('PAYMOB_API_KEY:', process.env.PAYMOB_API_KEY ? 'SET' : 'NOT SET');
+      console.log('PAYMOB_INTEGRATION_ID:', process.env.PAYMOB_INTEGRATION_ID ? 'SET' : 'NOT SET');
+      console.log('PAYMOB_HMAC_SECRET:', process.env.PAYMOB_HMAC_SECRET ? 'SET' : 'NOT SET');
+
+      // Create Paymob order and payment key
+      try {
+        console.log('Creating Paymob payment for rental:', rentalId, 'amount:', rental.pricing.total, 'currency:', currency);
+
+        // Fetch renter details for billing info
+        const renterDoc = await db.collection('users').doc(rental.renterId).get();
+        const renter = renterDoc.exists ? renterDoc.data() : null;
+
+        console.log('Renter data fetched:', renter ? 'exists' : 'not found');
+
+        const order = await paymob.createOrder({
+          amount: rental.pricing.total,
+          currency: currency,
+          merchantOrderId: `${rentalId}_${Date.now()}`,
+        });
+
+        console.log('Paymob order created:', order.orderId);
+
+        const paymentKeyResult = await paymob.createPaymentKey({
+          amount: rental.pricing.total,
+          currency: currency,
+          orderId: order.orderId,
+          billingData: {
+            email: (renter && (renter as any).email) || 'customer@example.com',
+            first_name: (renter && (renter as any).displayName) || 'Guest',
+            last_name: (renter && (renter as any).lastName) || '',
+            phone_number: (renter && (renter as any).phoneNumber) || '+201000000000',
+            city: (renter && (renter as any).location?.city) || 'Cairo',
+            country: (renter && (renter as any).location?.country) || 'EG',
+          },
+        });
+
+        console.log('Paymob payment key created');
+
+        updateData['payment.paymobOrderId'] = order.orderId;
+        updateData['payment.paymobPaymentKey'] = paymentKeyResult.paymentKey;
+        updateData['payment.paymentStatus'] = 'pending';
+      } catch (err) {
+        console.error('Paymob payment creation failed:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        throw new HttpsError('internal', `Failed to create payment: ${errorMessage}`);
+      }
     }
 
     await rentalRef.update(updateData);
 
-    // Send notification to renter
-    const notificationType = action === 'approve' ? 'rental_approved' : 'rental_rejected';
+    // Send notification to renter with payment link
+    const notificationType = action === 'approve' ? 'rental_payment_required' : 'rental_rejected';
     const notificationTitle = action === 'approve' ? 'Rental Approved!' : 'Rental Declined';
     const notificationBody = action === 'approve' 
-      ? 'Your rental request has been approved. Complete payment to confirm.'
+      ? 'Your rental request has been approved. Tap to complete payment.'
       : 'Your rental request has been declined.';
 
     await sendNotification(rental.renterId, {
@@ -441,6 +755,8 @@ export const processRentalResponse = onCall(async (request) => {
       data: {
         rentalId,
         itemId: rental.itemId,
+        deepLink: action === 'approve' ? `rentat://rental-payment/${rentalId}` : undefined,
+        action: action === 'approve' ? 'pay_now' : undefined,
       },
     });
 
@@ -464,7 +780,7 @@ export const processRentalResponse = onCall(async (request) => {
       });
     }
 
-    return { success: true, paymentClientSecret: action === 'approve' ? updateData['payment.stripePaymentIntentId'] : null };
+    return { success: true, paymentClientSecret: action === 'approve' ? updateData['payment.paymobPaymentKey'] : null };
   } catch (error) {
     console.error('Error processing rental response:', error);
     throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to process rental response');
@@ -508,7 +824,7 @@ export const completeRental = onCall(async (request) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       timeline: admin.firestore.FieldValue.arrayUnion({
         event: `${confirmationType}_confirmed_completion`,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: admin.firestore.Timestamp.now(),
         actor: auth.uid,
         details: damageReport ? { damageReport } : {},
       }),
@@ -904,16 +1220,7 @@ export const onMessageCreated = onDocumentCreated('chats/{chatId}/messages/{mess
 
     await Promise.all(notifications);
 
-    // Update unread counts for participants
-    const unreadUpdates = participants
-      .filter(uid => uid !== senderId)
-      .map(uid =>
-        chatRef.update({
-          [`metadata.unreadCount.${uid}`]: admin.firestore.FieldValue.increment(1),
-        })
-      );
-
-    await Promise.all(unreadUpdates);
+    console.log('Message created and notifications sent successfully');
 
   } catch (error) {
     console.error('Error handling message creation:', error);
@@ -952,7 +1259,8 @@ async function checkItemAvailability(itemId: string, startDate: Date, endDate: D
 }
 
 function calculateRentalPricing(item: any, startDate: Date, endDate: Date, deliveryMethod: string) {
-  const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const millisecondsPerDay = 1000 * 60 * 60 * 24;
+  const days = Math.ceil((endDate.getTime() - startDate.getTime()) / millisecondsPerDay);
   const dailyRate = item.pricing.dailyRate;
   
   let subtotal = dailyRate * days;
@@ -974,6 +1282,9 @@ function calculateRentalPricing(item: any, startDate: Date, endDate: Date, deliv
   
   const total = subtotal + platformFee + deliveryFee + securityDeposit;
   
+  // Ensure currency is always set to EGP (default for Egyptian market)
+  const currency = item.pricing.currency === 'EGP' ? 'EGP' : 'EGP';
+  
   return {
     dailyRate,
     totalDays: days,
@@ -982,20 +1293,27 @@ function calculateRentalPricing(item: any, startDate: Date, endDate: Date, deliv
     securityDeposit,
     deliveryFee,
     total,
-    currency: item.pricing.currency,
+    currency,
   };
 }
 
 async function sendNotification(userId: string, notification: any) {
   try {
+    console.log('📤 Sending notification to user:', userId, 'type:', notification.type);
+
     // Get user's FCM tokens
     const userDoc = await db.collection('users').doc(userId).get();
     const user = userDoc.data();
-    
-    if (!user?.fcmTokens?.length) return;
+
+    console.log('👤 User FCM tokens:', user?.fcmTokens?.length || 0);
+
+    if (!user?.fcmTokens?.length) {
+      console.warn('⚠️ No FCM tokens found for user:', userId);
+      return;
+    }
 
     // Create notification document
-    await db.collection('notifications').add({
+    const notificationRef = await db.collection('notifications').add({
       userId,
       ...notification,
       status: 'unread',
@@ -1006,126 +1324,563 @@ async function sendNotification(userId: string, notification: any) {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    console.log('✅ In-app notification created:', notificationRef.id);
+
     // Send push notification
     const message = {
       notification: {
         title: notification.title,
         body: notification.body,
       },
-      data: notification.data || {},
+      data: {
+        ...notification.data,
+        notificationId: notificationRef.id,
+      },
       tokens: user.fcmTokens,
     };
 
-    await admin.messaging().sendMulticast(message);
+    console.log('📱 Sending push notification to', user.fcmTokens.length, 'tokens');
+
+    const response = await admin.messaging().sendMulticast(message);
+    console.log('📱 Push notification result:', {
+      success: response.successCount,
+      failure: response.failureCount,
+    });
+
+    // Update notification delivery status
+    await notificationRef.update({
+      'delivery.push.sent': true,
+      'delivery.push.sentAt': admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
   } catch (error) {
-    console.error('Error sending notification:', error);
+    console.error('❌ Error sending notification:', error);
   }
 }
 
-async function handleStripeWebhook(event: Stripe.Event) {
-  switch (event.type) {
-    case 'payment_intent.succeeded':
-      await handlePaymentSuccess(event.data.object as Stripe.PaymentIntent);
-      break;
-    case 'payment_intent.payment_failed':
-      await handlePaymentFailure(event.data.object as Stripe.PaymentIntent);
-      break;
-    default:
-      console.log(`Unhandled event type: ${event.type}`);
-  }
-}
+/* Stripe payment handlers removed — payments now use Paymob.
+   Server-side Paymob webhook handlers / post-payment processing can be
+   implemented here if you need to mark payments succeeded/failed from Paymob webhooks.
+*/
 
-async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
-  const rentalId = paymentIntent.metadata.rentalId;
-  if (!rentalId) return;
+// Confirm item received by renter
+export const confirmItemReceived = onCall(async (request) => {
+  const { auth, data } = request;
+  
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rentalId } = data;
 
   try {
-    await db.collection('rentals').doc(rentalId).update({
-      'payment.paymentStatus': 'succeeded',
-      status: 'active',
-      'dates.actualStart': admin.firestore.FieldValue.serverTimestamp(),
+    const rentalRef = db.collection('rentals').doc(rentalId);
+    const rentalDoc = await rentalRef.get();
+    
+    if (!rentalDoc.exists) {
+      throw new HttpsError('not-found', 'Rental not found');
+    }
+
+    const rental = rentalDoc.data()!;
+    
+    // Verify user is the renter
+    if (rental.renterId !== auth.uid) {
+      throw new HttpsError('permission-denied', 'Only the renter can confirm item received');
+    }
+
+    // Verify rental is active
+    if (rental.status !== 'active') {
+      throw new HttpsError('failed-precondition', 'Rental must be active');
+    }
+
+    // Check if already confirmed
+    if (rental.completion?.itemReceived?.confirmed) {
+      throw new HttpsError('already-exists', 'Item receipt already confirmed');
+    }
+
+    // Update rental with item received confirmation
+    await rentalRef.update({
+      'completion.itemReceived': {
+        confirmed: true,
+        confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        confirmedBy: auth.uid,
+      },
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       timeline: admin.firestore.FieldValue.arrayUnion({
-        event: 'payment_completed',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        actor: 'system',
-        details: { paymentIntentId: paymentIntent.id },
+        event: 'item_received',
+        timestamp: admin.firestore.Timestamp.now(),
+        actor: auth.uid,
+        details: { message: 'Renter confirmed item received' },
       }),
     });
 
-    // Create wallet transaction
-    const rentalDoc = await db.collection('rentals').doc(rentalId).get();
+    // Send notification to owner
+    await sendNotification(rental.ownerId, {
+      type: 'rental_update',
+      title: 'Item Picked Up',
+      body: 'The renter has confirmed receiving the item',
+      data: { rentalId, itemId: rental.itemId },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error confirming item received:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to confirm item received');
+  }
+});
+
+// Confirm item returned by owner with optional damage report
+export const confirmItemReturned = onCall(async (request) => {
+  const { auth, data } = request;
+  
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rentalId, damageReport } = data;
+
+  try {
+    const rentalRef = db.collection('rentals').doc(rentalId);
+    const rentalDoc = await rentalRef.get();
+    
+    if (!rentalDoc.exists) {
+      throw new HttpsError('not-found', 'Rental not found');
+    }
+
+    const rental = rentalDoc.data()!;
+    
+    // Verify user is the owner
+    if (rental.ownerId !== auth.uid) {
+      throw new HttpsError('permission-denied', 'Only the owner can confirm item returned');
+    }
+
+    // Verify rental is active
+    if (rental.status !== 'active') {
+      throw new HttpsError('failed-precondition', 'Rental must be active');
+    }
+
+    // Check if already confirmed
+    if (rental.completion?.itemReturned?.ownerConfirmed) {
+      throw new HttpsError('already-exists', 'Item return already confirmed');
+    }
+
+    const updateData: any = {
+      'completion.itemReturned.ownerConfirmed': true,
+      'completion.itemReturned.ownerConfirmedAt': admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      timeline: admin.firestore.FieldValue.arrayUnion({
+        event: 'item_returned_confirmed',
+        timestamp: admin.firestore.Timestamp.now(),
+        actor: auth.uid,
+        details: damageReport ? { damageReport } : { message: 'Owner confirmed item returned in good condition' },
+      }),
+    };
+
+    // Add damage report if provided
+    if (damageReport) {
+      updateData['completion.itemReturned.damageReport'] = {
+        hasDamage: damageReport.hasDamage,
+        description: damageReport.description || '',
+        images: damageReport.images || [],
+        deductionAmount: damageReport.deductionAmount || 0,
+        reportedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+    }
+
+    await rentalRef.update(updateData);
+
+    // Process rental completion
+    await processRentalCompletion({ rentalId });
+
+    // Send notification to renter
+    const notificationBody = damageReport?.hasDamage
+      ? `Item returned with damage. Deposit deduction: ${rental.pricing.currency} ${damageReport.deductionAmount}`
+      : 'Item returned successfully. Your deposit will be refunded.';
+
+    await sendNotification(rental.renterId, {
+      type: 'rental_update',
+      title: 'Item Return Confirmed',
+      body: notificationBody,
+      data: { rentalId, itemId: rental.itemId, hasDamage: damageReport?.hasDamage || false },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error confirming item returned:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to confirm item returned');
+  }
+});
+
+// Process rental completion - calculate and process refunds/payouts
+async function processRentalCompletion(data: { rentalId: string }) {
+  const { rentalId } = data;
+
+  try {
+    const rentalRef = db.collection('rentals').doc(rentalId);
+    const rentalDoc = await rentalRef.get();
+    
+    if (!rentalDoc.exists) {
+      throw new Error('Rental not found');
+    }
+
     const rental = rentalDoc.data()!;
 
-    await db.collection('wallet_transactions').add({
-      userId: rental.renterId,
-      type: 'rental_payment',
-      amount: -rental.pricing.total,
+    // Calculate amounts
+    const damageDeduction = rental.completion?.itemReturned?.damageReport?.deductionAmount || 0;
+    const depositRefund = Math.max(0, rental.pricing.securityDeposit - damageDeduction);
+    const ownerPayout = rental.pricing.subtotal - rental.pricing.platformFee + damageDeduction;
+
+    // Update rental with completion details
+    await rentalRef.update({
+      status: 'completed',
+      'completion.completedAt': admin.firestore.FieldValue.serverTimestamp(),
+      'completion.refund': {
+        status: 'processed',
+        amount: depositRefund,
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      'completion.payout': {
+        status: 'processed',
+        amount: ownerPayout,
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      'dates.actualEnd': admin.firestore.FieldValue.serverTimestamp(),
+      'payment.depositStatus': 'refunded',
+      'payment.payoutStatus': 'completed',
+      'payment.refundAmount': depositRefund,
+      'payment.escrow': {
+        totalHeld: rental.pricing.total,
+        depositAmount: rental.pricing.securityDeposit,
+        ownerPayout,
+        platformFee: rental.pricing.platformFee,
+      },
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      timeline: admin.firestore.FieldValue.arrayUnion({
+        event: 'rental_completed',
+        timestamp: admin.firestore.Timestamp.now(),
+        actor: 'system',
+        details: { depositRefund, ownerPayout, damageDeduction },
+      }),
+    });
+
+    // Create wallet transactions
+    const batch = db.batch();
+
+    // Deposit refund transaction for renter (if any)
+    if (depositRefund > 0) {
+      const renterTxRef = db.collection('wallet_transactions').doc();
+      batch.set(renterTxRef, {
+        userId: rental.renterId,
+        type: 'deposit_refund',
+        amount: depositRefund,
+        currency: rental.pricing.currency,
+        status: 'completed',
+        relatedRentalId: rentalId,
+        relatedItemId: rental.itemId,
+        payment: {
+          description: `Security deposit refund${damageDeduction > 0 ? ` (${rental.pricing.currency} ${damageDeduction} deducted for damages)` : ''}`,
+        },
+        metadata: {
+          originalDeposit: rental.pricing.securityDeposit,
+          damageDeduction,
+          netAmount: depositRefund,
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Owner payout transaction (credited to wallet)
+    const ownerTxRef = db.collection('wallet_transactions').doc();
+    batch.set(ownerTxRef, {
+      userId: rental.ownerId,
+      type: 'rental_payout',
+      amount: ownerPayout,
       currency: rental.pricing.currency,
       status: 'completed',
       relatedRentalId: rentalId,
       relatedItemId: rental.itemId,
       payment: {
-        stripeTransactionId: paymentIntent.id,
-        description: `Payment for rental`,
+        description: 'Rental completed - amount credited to wallet',
       },
       metadata: {
+        subtotal: rental.pricing.subtotal,
         platformFee: rental.pricing.platformFee,
-        netAmount: -rental.pricing.total,
+        damageCompensation: damageDeduction,
+        netAmount: ownerPayout,
       },
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       processedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // Send notifications
-    await sendNotification(rental.renterId, {
-      type: 'payment',
-      title: 'Payment Successful',
-      body: 'Your rental payment has been processed successfully',
-      data: { rentalId },
-    });
+    await batch.commit();
 
-    await sendNotification(rental.ownerId, {
-      type: 'rental_confirmed',
-      title: 'Rental Confirmed',
-      body: 'Your item has been successfully rented',
-      data: { rentalId },
-    });
+    // Update wallet balances
+    const walletUpdates = [];
+
+    // Update owner wallet
+    walletUpdates.push(
+      db.collection('users').doc(rental.ownerId).update({
+        'wallet.balance': admin.firestore.FieldValue.increment(ownerPayout),
+        'wallet.totalEarnings': admin.firestore.FieldValue.increment(ownerPayout),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      })
+    );
+
+    // Note: Deposit refund would typically go back to the original payment method
+    // For now, we're tracking it in transactions but not adding to wallet balance
+
+    await Promise.all(walletUpdates);
+
+    // Send completion notifications
+    await Promise.all([
+      sendNotification(rental.ownerId, {
+        type: 'rental_completed',
+        title: 'Rental Completed',
+        body: `You've earned ${rental.pricing.currency} ${ownerPayout.toFixed(2)} (credited to your wallet)`,
+        data: { rentalId, itemId: rental.itemId },
+      }),
+      sendNotification(rental.renterId, {
+        type: 'rental_completed',
+        title: 'Rental Completed',
+        body: depositRefund > 0 
+          ? `Your deposit of ${rental.pricing.currency} ${depositRefund.toFixed(2)} will be refunded` 
+          : 'Rental completed successfully',
+        data: { rentalId, itemId: rental.itemId },
+      }),
+    ]);
+
+    console.log(`Rental ${rentalId} completed successfully. Owner payout: ${ownerPayout}, Deposit refund: ${depositRefund}`);
   } catch (error) {
-    console.error('Error handling payment success:', error);
+    console.error('Error processing rental completion:', error);
+    throw error;
   }
 }
 
-async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
-  const rentalId = paymentIntent.metadata.rentalId;
-  if (!rentalId) return;
+// Refresh payment key for rental - creates fresh payment session
+export const refreshPaymentKey = onCall(async (request) => {
+  const { auth, data } = request;
+
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rentalId } = data;
 
   try {
-    await db.collection('rentals').doc(rentalId).update({
-      'payment.paymentStatus': 'failed',
-      status: 'rejected',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      timeline: admin.firestore.FieldValue.arrayUnion({
-        event: 'payment_failed',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        actor: 'system',
-        details: { paymentIntentId: paymentIntent.id },
-      }),
-    });
+    const rentalRef = db.collection('rentals').doc(rentalId);
+    const rentalDoc = await rentalRef.get();
 
-    const rentalDoc = await db.collection('rentals').doc(rentalId).get();
+    if (!rentalDoc.exists) {
+      throw new HttpsError('not-found', 'Rental not found');
+    }
+
     const rental = rentalDoc.data()!;
 
-    await sendNotification(rental.renterId, {
-      type: 'payment',
-      title: 'Payment Failed',
-      body: 'Your rental payment could not be processed. Please try again.',
-      data: { rentalId },
+    // Verify user is the renter
+    if (rental.renterId !== auth.uid) {
+      throw new HttpsError('permission-denied', 'Only the renter can refresh payment keys');
+    }
+
+    // Verify rental is in approved status and payment is pending or failed, or rejected with failed payment
+    if (rental.status !== 'approved' && rental.status !== 'declined' && rental.status !== 'rejected') {
+      throw new HttpsError('failed-precondition', 'Rental must be approved, declined, or rejected for retry');
+    }
+
+    // Check payment status - allow both pending (first attempt) and failed (retry)
+    if (rental.payment?.paymentStatus !== 'pending' && rental.payment?.paymentStatus !== 'failed') {
+      throw new HttpsError('failed-precondition', 'Payment must be in pending or failed status');
+    }
+
+    const renterDoc = await db.collection('users').doc(rental.renterId).get();
+    const renter = renterDoc.exists ? renterDoc.data() : null;
+
+    console.log('Renter data fetched:', renter ? 'exists' : 'not found');
+
+    // Create new Paymob order and payment key
+    const order = await paymob.createOrder({
+      amount: rental.pricing.total,
+      currency: rental.pricing.currency,
+      merchantOrderId: `${rentalId}_${Date.now()}`,
     });
+
+    console.log('Paymob order created:', order.orderId);
+
+    const paymentKeyResult = await paymob.createPaymentKey({
+      amount: rental.pricing.total,
+      currency: rental.pricing.currency,
+      orderId: order.orderId,
+      billingData: {
+        email: (renter && (renter as any).email) || 'customer@example.com',
+        first_name: (renter && (renter as any).displayName) || 'Guest',
+        last_name: (renter && (renter as any).lastName) || '',
+        phone_number: (renter && (renter as any).phoneNumber) || '+201000000000',
+        city: (renter && (renter as any).location?.city) || 'Cairo',
+        country: (renter && (renter as any).location?.country) || 'EG',
+      },
+    });
+
+    console.log('Paymob payment key created');
+
+    // Update rental with new payment key and orderId
+    await rentalRef.update({
+      'payment.paymobOrderId': order.orderId,
+      'payment.paymobPaymentKey': paymentKeyResult.paymentKey,
+      'payment.paymentStatus': 'pending',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.log('Rental updated with new payment details');
+
+    return {
+      success: true,
+      paymentKey: paymentKeyResult.paymentKey,
+      orderId: order.orderId,
+    };
   } catch (error) {
-    console.error('Error handling payment failure:', error);
+    console.error('Error refreshing payment key:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to refresh payment key');
   }
-}
+});
+
+// Request payout - Owner requests withdrawal from wallet
+export const requestPayout = onCall(async (request) => {
+  const { auth, data } = request;
+
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { amount, method } = data; // method: 'bank_transfer' | 'mobile_wallet'
+
+  try {
+    // Get user wallet
+    const userRef = db.collection('users').doc(auth.uid);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      throw new HttpsError('not-found', 'User not found');
+    }
+
+    const user = userDoc.data()!;
+    const wallet = user.wallet || { balance: 0 };
+
+    // Validate withdrawal amount
+    if (!amount || amount <= 0) {
+      throw new HttpsError('invalid-argument', 'Invalid withdrawal amount');
+    }
+
+    if (amount > wallet.balance) {
+      throw new HttpsError('failed-precondition', 'Insufficient wallet balance');
+    }
+
+    // Create payout request
+    const payoutRef = await db.collection('payout_requests').add({
+      userId: auth.uid,
+      amount,
+      currency: 'EGP', // Default currency
+      method,
+      status: 'pending',
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      metadata: {
+        userName: user.displayName,
+        userEmail: user.email,
+        walletBalanceBefore: wallet.balance,
+      },
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Update user wallet - reserve the amount
+    await userRef.update({
+      'wallet.balance': admin.firestore.FieldValue.increment(-amount),
+      'wallet.pendingWithdrawal': admin.firestore.FieldValue.increment(amount),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Create wallet transaction
+    await db.collection('wallet_transactions').add({
+      userId: auth.uid,
+      type: 'withdrawal_request',
+      amount: -amount,
+      currency: 'EGP',
+      status: 'pending',
+      payment: {
+        description: `Withdrawal request - ${method}`,
+      },
+      metadata: {
+        payoutRequestId: payoutRef.id,
+        method,
+      },
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Send notification to user
+    await sendNotification(auth.uid, {
+      type: 'payout',
+      title: 'Withdrawal Request Submitted',
+      body: `Your withdrawal request for EGP ${amount} is being processed`,
+      data: { payoutRequestId: payoutRef.id },
+    });
+
+    return {
+      success: true,
+      payoutRequestId: payoutRef.id,
+      estimatedProcessingTime: '1-3 business days',
+    };
+  } catch (error) {
+    console.error('Error requesting payout:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to request payout');
+  }
+});
+
+// Callable to mark all notifications as read for the authenticated user
+export const markAllNotificationsRead = onCall(async (request) => {
+  const { auth } = request;
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  try {
+    const userId = auth.uid;
+    const notifsSnap = await db.collection('notifications')
+      .where('userId', '==', userId)
+      .where('status', '==', 'unread')
+      .get();
+
+    if (notifsSnap.empty) {
+      return { updated: 0 };
+    }
+
+    const commits: Promise<any>[] = [];
+    let batch = db.batch();
+    let ops = 0;
+    let total = 0;
+
+    notifsSnap.docs.forEach((doc) => {
+      batch.update(doc.ref, {
+        status: 'read',
+        readAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      ops++;
+      total++;
+      if (ops === 500) {
+        commits.push(batch.commit());
+        batch = db.batch();
+        ops = 0;
+      }
+    });
+
+    if (ops > 0) commits.push(batch.commit());
+    await Promise.all(commits);
+
+    return { updated: total };
+  } catch (error) {
+    console.error('Error marking all notifications read:', error);
+    throw new HttpsError('internal', 'Failed to mark notifications as read');
+  }
+});
 
 async function handleRentalStatusChange(rentalId: string, oldStatus: string, newStatus: string, rental: any) {
   // Handle various status transitions
@@ -1166,7 +1921,7 @@ async function completeRentalTransaction(rentalId: string, rental: any) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       timeline: admin.firestore.FieldValue.arrayUnion({
         event: 'rental_completed',
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: admin.firestore.Timestamp.now(),
         actor: 'system',
         details: { depositRefund, ownerPayout, damageAmount },
       }),

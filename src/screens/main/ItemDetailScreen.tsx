@@ -27,6 +27,7 @@ import { getGovernorateById } from '../../data/governorates';
 import { moderationService, ReportReason } from '../../services/moderation';
 import ReportModal from '../../components/ui/ReportModal';
 import ImageGallery from '../../components/ImageGallery';
+import { favoritesService } from '../../services/favorites';
 
 
 const { width } = Dimensions.get('window');
@@ -43,13 +44,17 @@ const ItemDetailScreen: React.FC = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   // Modal state
   const [reportModalVisible, setReportModalVisible] = useState(false);
 
   useEffect(() => {
     loadItem();
-  }, [itemId]);
+    if (user) {
+      checkFavoriteStatus();
+    }
+  }, [itemId, user]);
 
   useEffect(() => {
     if (owner?.uid) {
@@ -120,6 +125,17 @@ const ItemDetailScreen: React.FC = () => {
     (navigation as any).navigate('RentalRequest', { itemId: item?.id });
   };
 
+  const checkFavoriteStatus = async () => {
+    if (!user || !itemId) return;
+    
+    try {
+      const favorited = await favoritesService.isItemFavorited(user.uid, itemId);
+      setIsFavorite(favorited);
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
+
   const handleFavorite = async () => {
     if (!user) {
       showModal({
@@ -129,7 +145,30 @@ const ItemDetailScreen: React.FC = () => {
       });
       return;
     }
-    setIsFavorite(!isFavorite);
+
+    if (favoriteLoading) return;
+
+    try {
+      setFavoriteLoading(true);
+      const newStatus = await favoritesService.toggleFavorite(user.uid, itemId);
+      setIsFavorite(newStatus);
+      
+      Toast.show({
+        type: 'success',
+        text1: newStatus ? 'Added to Favorites' : 'Removed from Favorites',
+        text2: newStatus ? 'Item saved to your favorites' : 'Item removed from favorites',
+        position: 'top',
+      });
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      showModal({
+        title: 'Error',
+        message: 'Failed to update favorites. Please try again.',
+        type: 'error',
+      });
+    } finally {
+      setFavoriteLoading(false);
+    }
   };
 
   const handleShare = async () => {

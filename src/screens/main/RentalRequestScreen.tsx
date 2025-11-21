@@ -10,13 +10,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { httpsCallable } from 'firebase/functions';
 import Button from '../../components/ui/Button';
 import CustomModal from '../../components/ui/CustomModal';
-import DatePickerModal from '../../components/ui/DatePickerModal';
-import AvailabilityCalendar from '../../components/calendar/AvailabilityCalendar';
+import RentalDatePicker from '../../components/calendar/RentalDatePicker';
 import { RentalService, ItemService, UserService } from '../../services/firestore';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { Item, Rental } from '../../types';
+import { functions } from '../../config/firebase';
 
 const RentalRequestScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -27,10 +28,9 @@ const RentalRequestScreen: React.FC = () => {
   const [item, setItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<{ start: Date | null; end: Date | null }>({
-    start: null,
-    end: null,
-  });
+  // Range selection for calendar
+  const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(null);
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null);
   const [message, setMessage] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery' | 'meetInMiddle'>('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -111,64 +111,18 @@ const RentalRequestScreen: React.FC = () => {
     }
   };
 
-  const rentalDays = selectedDates.start && selectedDates.end
-    ? Math.ceil((selectedDates.end.getTime() - selectedDates.start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    : 0;
-
+  // Calculate rental days from selected range
+  const rentalDays =
+    selectedStartDate && selectedEndDate
+      ? Math.ceil((selectedEndDate.getTime() - selectedStartDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
   const dailyRate = item?.pricing.dailyRate || 0;
   const totalCost = rentalDays * dailyRate;
   const securityDeposit = item?.pricing.securityDeposit || 0;
   const platformFee = Math.round(totalCost * 0.1); // 10% platform fee
   const totalAmount = totalCost + securityDeposit + platformFee;
 
-  const handleDateRangeSelect = (dates: { start: Date; end: Date }) => {
-    if (!item) return;
-
-    const days = Math.ceil((dates.end.getTime() - dates.start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-    if (days < item.availability.minRentalDays) {
-      showModal(
-        'Invalid Selection',
-        `Minimum rental period is ${item.availability.minRentalDays} day(s). Please select a longer period.`,
-        'warning'
-      );
-      return;
-    }
-
-    if (days > item.availability.maxRentalDays) {
-      showModal(
-        'Invalid Selection',
-        `Maximum rental period is ${item.availability.maxRentalDays} day(s). Please select a shorter period.`,
-        'warning'
-      );
-      return;
-    }
-
-    setSelectedDates({ start: dates.start, end: dates.end });
-  };
-
-  const handleDateSelect = (date: Date) => {
-    if (datePickerType === 'start') {
-      // If selecting start date and end date exists, ensure start is before end
-      if (selectedDates.end && date >= selectedDates.end) {
-        showModal('Invalid Selection', 'Start date must be before end date.', 'warning');
-        return;
-      }
-      setSelectedDates(prev => ({ ...prev, start: date }));
-    } else {
-      // If selecting end date and start date exists, ensure end is after start
-      if (selectedDates.start && date <= selectedDates.start) {
-        showModal('Invalid Selection', 'End date must be after start date.', 'warning');
-        return;
-      }
-      setSelectedDates(prev => ({ ...prev, end: date }));
-    }
-  };
-
-  const openDatePicker = (type: 'start' | 'end') => {
-    setDatePickerType(type);
-    setDatePickerVisible(true);
-  };
+  // Date range logic removed for single date selection
 
   const handleSubmitRequest = async () => {
     if (!user || !item) {
@@ -201,8 +155,8 @@ const RentalRequestScreen: React.FC = () => {
       return;
     }
 
-    if (!selectedDates.start || !selectedDates.end) {
-      showModal('Missing Information', 'Please select rental dates', 'warning');
+    if (!selectedStartDate || !selectedEndDate) {
+      showModal('Missing Information', 'Please select rental date range', 'warning');
       return;
     }
 
@@ -214,65 +168,22 @@ const RentalRequestScreen: React.FC = () => {
     try {
       setSubmitting(true);
 
-      const rentalRequest: Omit<Rental, 'id' | 'createdAt' | 'updatedAt'> = {
+      // Use the cloud function to process rental request (sends notifications)
+      const callable = httpsCallable(functions, 'processRentalRequest');
+      const result = await callable({
         itemId: item.id,
-        renterId: user.uid,
-        ownerId: item.ownerId,
-        status: 'pending',
-        dates: {
-          requestedStart: selectedDates.start,
-          requestedEnd: selectedDates.end,
-        },
-        pricing: {
-          dailyRate: item.pricing.dailyRate,
-          totalDays: rentalDays,
-          subtotal: totalCost,
-          securityDeposit: securityDeposit,
-          platformFee: platformFee,
-          total: totalAmount,
-          currency: 'EGP',
-        },
-        delivery: {
-          method: deliveryMethod === 'meetInMiddle' ? 'meet-in-middle' : deliveryMethod,
-          ...(deliveryMethod === 'delivery' && {
-            pickupLocation: {
-              latitude: item.location.latitude,
-              longitude: item.location.longitude,
-              address: item.location.address,
-            },
-            deliveryLocation: {
-              latitude: 0, // Would be set based on delivery address in real app
-              longitude: 0,
-              address: deliveryAddress,
-            },
-          }),
-        },
-        payment: {
-          paymobOrderId: '', // Would be created during payment processing
-          paymobTransactionId: '', // Would be set after payment completion
-          paymentStatus: 'pending',
-          depositStatus: 'held',
-          payoutStatus: 'pending',
-        },
-        communication: {
-          chatId: '', // Would be created when chat is initiated
-        },
-        completion: {},
-        timeline: [
-          {
-            event: 'rental_requested',
-            timestamp: new Date(),
-            actor: user.uid,
-            details: {
-              ...(message.trim() && { message: message.trim() }),
-              deliveryMethod,
-              ...(deliveryMethod === 'delivery' && { deliveryAddress }),
-            },
-          },
-        ],
-      };
+        startDate: selectedStartDate.toISOString(),
+        endDate: selectedEndDate.toISOString(),
+        deliveryMethod: deliveryMethod === 'meetInMiddle' ? 'meet-in-middle' : deliveryMethod,
+        deliveryLocation: deliveryMethod === 'delivery' ? {
+          latitude: 0, // Would be set based on delivery address in real app
+          longitude: 0,
+          address: deliveryAddress,
+        } : null,
+        message: message.trim() || null,
+      });
 
-      const rentalId = await RentalService.createRental(rentalRequest);
+      const { rentalId, chatId } = result.data as { rentalId: string; chatId: string; pricing: any };
 
       showModal(
         'Request Submitted!',
@@ -283,8 +194,6 @@ const RentalRequestScreen: React.FC = () => {
             text: 'OK',
             onPress: () => {
               navigation.goBack();
-              // Navigate to rental tracking screen
-              // navigation.navigate('RentalTracking', { rentalId });
             },
           },
         ]
@@ -347,74 +256,17 @@ const RentalRequestScreen: React.FC = () => {
           <Text style={styles.sectionDescription}>
             Choose your preferred rental period. The item must be rented for at least {item.availability.minRentalDays} day(s).
           </Text>
-
-          <View style={styles.dateSelection}>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => openDatePicker('start')}
-            >
-              <Ionicons name="calendar-outline" size={20} color="#4639eb" />
-              <View style={styles.dateButtonContent}>
-                <Text style={styles.dateButtonLabel}>Start Date</Text>
-                <Text style={styles.dateButtonValue}>
-                  {selectedDates.start ? formatDate(selectedDates.start) : 'Select start date'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => openDatePicker('end')}
-            >
-              <Ionicons name="calendar-outline" size={20} color="#4639eb" />
-              <View style={styles.dateButtonContent}>
-                <Text style={styles.dateButtonLabel}>End Date</Text>
-                <Text style={styles.dateButtonValue}>
-                  {selectedDates.end ? formatDate(selectedDates.end) : 'Select end date'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Quick date presets */}
-          <View style={styles.datePresets}>
-            <Text style={styles.presetsTitle}>Quick Select:</Text>
-            <View style={styles.presetButtons}>
-              {[1, 3, 7, 14, 30].map(days => (
-                <TouchableOpacity
-                  key={days}
-                  style={styles.presetButton}
-                  onPress={() => {
-                    const start = new Date();
-                    const end = new Date();
-                    end.setDate(end.getDate() + days);
-                    handleDateRangeSelect({ start, end });
-                  }}
-                >
-                  <Text style={styles.presetButtonText}>{days} day{days !== 1 ? 's' : ''}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {selectedDates.start && selectedDates.end && (
-            <View style={styles.selectedDatesInfo}>
-              <Text style={styles.selectedDatesText}>
-                Selected: {formatDate(selectedDates.start)} - {formatDate(selectedDates.end)}
-              </Text>
-              <Text style={styles.durationText}>
-                Duration: {rentalDays} day{rentalDays !== 1 ? 's' : ''}
-              </Text>
-              <Text style={styles.limitsText}>
-                Min: {item.availability.minRentalDays} days • Max: {item.availability.maxRentalDays} days
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Delivery Method */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery Method</Text>
+          <RentalDatePicker
+            itemId={item.id}
+            minRentalDays={item.availability.minRentalDays}
+            maxRentalDays={item.availability.maxRentalDays}
+            selectedStartDate={selectedStartDate}
+            selectedEndDate={selectedEndDate}
+            onDateRangeSelect={(start, end) => {
+              setSelectedStartDate(start);
+              setSelectedEndDate(end);
+            }}
+          />
 
           {item.location.deliveryOptions.pickup && (
             <TouchableOpacity
@@ -578,7 +430,7 @@ const RentalRequestScreen: React.FC = () => {
           title="Submit Request"
           onPress={handleSubmitRequest}
           loading={submitting}
-          disabled={submitting || !selectedDates.start || !selectedDates.end}
+          disabled={submitting || !selectedStartDate || !selectedEndDate}
           style={styles.submitButton}
         />
       </View>
@@ -593,15 +445,7 @@ const RentalRequestScreen: React.FC = () => {
         onClose={() => setModalVisible(false)}
       />
 
-      {/* Date Picker Modal */}
-      <DatePickerModal
-        visible={datePickerVisible}
-        selectedDate={datePickerType === 'start' ? selectedDates.start || undefined : selectedDates.end || undefined}
-        minDate={datePickerType === 'end' && selectedDates.start ? selectedDates.start : undefined}
-        onDateSelect={handleDateSelect}
-        onClose={() => setDatePickerVisible(false)}
-        title={datePickerType === 'start' ? 'Select Start Date' : 'Select End Date'}
-      />
+      {/* Date Picker Modal removed: now using RentalDatePicker for range selection */}
     </SafeAreaView>
   );
 };

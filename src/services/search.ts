@@ -33,8 +33,8 @@ export interface SearchFilters {
   
   // Date filters
   dateRange?: {
-    startDate: Date;
-    endDate: Date;
+    start: Date;
+    end: Date;
   };
   
   // Price filters
@@ -46,7 +46,7 @@ export interface SearchFilters {
   
   // Advanced filters
   features?: string[];
-  condition?: ('new' | 'excellent' | 'good' | 'fair')[];
+  condition?: ('new' | 'like-new' | 'good' | 'fair' | 'poor')[];
   availability?: 'available' | 'busy' | 'unavailable';
   deliveryOptions?: ('pickup' | 'delivery' | 'meetup')[];
   
@@ -152,163 +152,209 @@ export class SearchService {
   // Main search function
   public async search(filters: SearchFilters): Promise<SearchResult> {
     try {
-      // Start with a simple query to get items, then filter client-side
-      // This avoids complex composite indexes for MVP
-      let baseQuery = collection(db, collections.items);
-      let constraints: any[] = [];
+      const baseRef = collection(db, collections.items);
+      const constraints: any[] = [];
 
-      // Basic availability filter - check status is active
-      constraints.push(where('status', '==', 'active'));
+      // Always only return active/listable items unless requested otherwise
+      if (!filters.availability || filters.availability === 'available') {
+        constraints.push(where('status', '==', 'active'));
+      } else if (filters.availability === 'busy') {
+        constraints.push(where('status', '==', 'busy'));
+      } else if (filters.availability === 'unavailable') {
+        constraints.push(where('status', '==', 'unavailable'));
+      }
 
-      // For MVP, we'll use a simple query and do most filtering client-side
-      // to avoid needing complex composite indexes
-      constraints.push(orderBy('createdAt', 'desc'));
-      constraints.push(limit(100)); // Get more items and filter client-side
-
-      // Build the query
-      const searchQuery = query(baseQuery, ...constraints);
-      const snapshot = await getDocs(searchQuery);
-
-      let items = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      })) as Item[];
-
-      // Apply client-side filters
-
-      // Category filter
+      // Category/subcategory - server-side
       if (filters.category && filters.category !== 'all') {
-        items = items.filter(item => item.category === filters.category);
+        constraints.push(where('category', '==', filters.category));
       }
-
       if (filters.subcategory) {
-        items = items.filter(item => item.subcategory === filters.subcategory);
+        constraints.push(where('subcategory', '==', filters.subcategory));
       }
 
-      // Price range filter
+      // Price range - server-side partial (requires composite indexes for complex combinations)
       if (filters.priceRange) {
-        if (filters.priceRange.min > 0) {
-          items = items.filter(item => (item.pricing?.dailyRate || 0) >= filters.priceRange!.min);
+        const min = typeof filters.priceRange.min === 'number' ? filters.priceRange.min : 0;
+        const max = typeof filters.priceRange.max === 'number' ? filters.priceRange.max : Number.POSITIVE_INFINITY;
+
+        // Only add server-side bounds when they are finite numbers
+        if (isFinite(min)) {
+          constraints.push(where('pricing.dailyRate', '>=', min));
         }
-        if (filters.priceRange.max > 0 && filters.priceRange.max < 10000) {
-          items = items.filter(item => (item.pricing?.dailyRate || 0) <= filters.priceRange!.max);
+        if (isFinite(max)) {
+          constraints.push(where('pricing.dailyRate', '<=', max));
         }
       }
 
-      // Condition filter
+      // Condition filter - use 'in' query when possible
       if (filters.condition && filters.condition.length > 0) {
-        items = items.filter(item =>
-          filters.condition!.includes(item.condition as any)
-        );
+        // Firestore 'in' supports up to 10 values
+        constraints.push(where('condition', 'in', filters.condition.slice(0, 10) as any));
       }
 
-      // Apply additional client-side filters that can't be done in Firestore
-
-      // Text search filter (simple keyword matching)
-      if (filters.query) {
-        const queryLower = filters.query.toLowerCase();
-        items = items.filter(item =>
-          item.title.toLowerCase().includes(queryLower) ||
-          item.description.toLowerCase().includes(queryLower) ||
-          item.tags?.some(tag => tag.toLowerCase().includes(queryLower))
-        );
+      // Minimum rating
+      if (typeof filters.minRating === 'number') {
+        constraints.push(where('ratings.average', '>=', filters.minRating));
       }
 
-      // Verified owners filter - requires joining with users collection
-      if (filters.verifiedOwners) {
-        // For now, we'll skip this filter since it requires a join
-        // In production, you'd want to denormalize this data or use a different approach
-        console.log('Verified owners filter applied (simplified)');
+      // Basic sorting: construct orderBy clauses carefully to satisfy Firestore
+      const limitCount = filters.limit || 30;
+
+      // Build an ordered list of orderBy clauses. Firestore requires that range filters use the same field that is ordered first
+      const orderClauses: Array<ReturnType<typeof orderBy>> = [];
+
+      // Prefer explicit ordering requested by user
+      if (filters.sortBy === 'price_low' || filters.sortBy === 'price_high') {
+        // If ordering by price, ensure we order by pricing.dailyRate first (Firestone may require an index if combined with other where clauses)
+        orderClauses.push(orderBy('pricing.dailyRate', filters.sortBy === 'price_low' ? 'asc' : 'desc') as any);
+        // Fallback to createdAt for determinism
+        orderClauses.push(orderBy('createdAt', 'desc') as any);
+      } else if (filters.sortBy === 'rating') {
+        orderClauses.push(orderBy('ratings.average', 'desc') as any);
+        orderClauses.push(orderBy('createdAt', 'desc') as any);
+      } else if (filters.sortBy === 'newest') {
+        orderClauses.push(orderBy('createdAt', 'desc') as any);
+      } else if (filters.sortBy === 'distance' && filters.location) {
+        // Cannot order by distance server-side; use createdAt server-side and sort client-side by distance
+        orderClauses.push(orderBy('createdAt', 'desc') as any);
+      } else {
+        // Default ordering
+        orderClauses.push(orderBy('createdAt', 'desc') as any);
       }
 
-      // Min rating filter
-      if (filters.minRating) {
-        items = items.filter(item =>
-          (item.ratings?.average || 0) >= filters.minRating!
-        );
+      // Apply order clauses to constraints
+      for (const oc of orderClauses) {
+        constraints.push(oc as any);
       }
 
-      // Instant booking filter - requires checking owner preferences
-      if (filters.instantBooking) {
-        // For now, we'll skip this filter since it requires a join
-        // In production, you'd want to denormalize this data
-        console.log('Instant booking filter applied (simplified)');
-      }
+      constraints.push(limit(limitCount));
 
-      // Location filter (distance calculation)
-      if (filters.location) {
-        items = items.filter(item => {
-          if (!item.location?.latitude || !item.location?.longitude) return false;
-          
-          const distance = this.calculateDistance(
-            filters.location!.latitude,
-            filters.location!.longitude,
-            item.location.latitude,
-            item.location.longitude
-          );
-          
-          return distance <= filters.location!.radius;
-        });
-
-        // Sort by distance if location filter is applied
-        if (filters.sortBy === 'distance') {
-          items = items.sort((a, b) => {
-            const distanceA = this.calculateDistance(
-              filters.location!.latitude,
-              filters.location!.longitude,
-              a.location?.latitude || 0,
-              a.location?.longitude || 0
-            );
-            const distanceB = this.calculateDistance(
-              filters.location!.latitude,
-              filters.location!.longitude,
-              b.location?.latitude || 0,
-              b.location?.longitude || 0
-            );
-            return distanceA - distanceB;
-          });
+      // Pagination support (startAfter) - requires passing lastDocumentId which we try to resolve
+      if (filters.lastDocumentId) {
+        try {
+          const lastDocRef = doc(db, collections.items, filters.lastDocumentId);
+          const lastSnap = await getDoc(lastDocRef as any);
+          if (lastSnap.exists()) {
+            constraints.push(startAfter(lastSnap));
+          }
+        } catch (err) {
+          // ignore pagination if last document not found
         }
       }
 
-      // Date availability filter
-      if (filters.dateRange) {
-        items = await this.filterByAvailability(items, filters.dateRange);
+      // Location bounding box - reduce server-side result set when location filter exists
+      if (filters.location) {
+        const { latitude, longitude, radius } = filters.location;
+        // Approximate bounding box (latitude +/-, longitude +/-)
+        const latDelta = radius / 111.12; // ~km per degree latitude
+        const lngDelta = Math.abs(radius / (111.12 * Math.cos((latitude * Math.PI) / 180)));
+
+        const minLat = latitude - latDelta;
+        const maxLat = latitude + latDelta;
+        const minLng = longitude - lngDelta;
+        const maxLng = longitude + lngDelta;
+
+        // These range queries may require composite indexes to work together with other where clauses.
+        constraints.push(where('location.latitude', '>=', minLat));
+        constraints.push(where('location.latitude', '<=', maxLat));
+        constraints.push(where('location.longitude', '>=', minLng));
+        constraints.push(where('location.longitude', '<=', maxLng));
       }
 
-      // Delivery options filter
+      // Build the Firestore query
+      const firestoreQuery = query(baseRef, ...constraints);
+
+      // Execute server-side query
+      const snapshot = await getDocs(firestoreQuery);
+
+      // Map to items
+      let items = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          ...data,
+          createdAt: data.createdAt?.toDate?.() || data.createdAt,
+          updatedAt: data.updatedAt?.toDate?.() || data.updatedAt,
+        } as Item;
+      });
+
+      // Client-side filters that are hard/expensive server-side
+      // Text search
+      if (filters.query) {
+        const qLower = filters.query.toLowerCase();
+        items = items.filter(item =>
+          (item.title || '').toLowerCase().includes(qLower) ||
+          (item.description || '').toLowerCase().includes(qLower) ||
+          (item.tags || []).some((t: string) => t.toLowerCase().includes(qLower))
+        );
+      }
+
+      // Delivery options - cannot OR across different fields reliably server-side without composite indexes, so apply client-side
       if (filters.deliveryOptions && filters.deliveryOptions.length > 0) {
         items = items.filter(item => {
           if (!item.location?.deliveryOptions) return false;
-
           return filters.deliveryOptions!.some(option => {
             switch (option) {
-              case 'pickup':
-                return item.location?.deliveryOptions?.pickup;
-              case 'delivery':
-                return item.location?.deliveryOptions?.delivery;
-              case 'meetup':
-                return item.location?.deliveryOptions?.meetInMiddle;
-              default:
-                return false;
+              case 'pickup': return !!item.location.deliveryOptions.pickup;
+              case 'delivery': return !!item.location.deliveryOptions.delivery;
+              case 'meetup': return !!item.location.deliveryOptions.meetInMiddle;
+              default: return false;
             }
           });
         });
       }
 
-      // Apply boost prioritization (unless sorting by specific criteria)
-      if (!filters.sortBy || filters.sortBy === 'relevance') {
-        items = await this.applyBoostPrioritization(items);
+      // Exact distance filtering and precise sorting when location is provided
+      if (filters.location) {
+        items = items
+          .map(it => {
+            if (!it.location?.latitude || !it.location?.longitude) return { item: it, distance: Number.POSITIVE_INFINITY };
+            const dist = this.calculateDistance(filters.location!.latitude, filters.location!.longitude, it.location.latitude, it.location.longitude);
+            return { item: it, distance: dist };
+          })
+          .filter(x => x.distance <= (filters.location!.radius || Number.POSITIVE_INFINITY))
+          .sort((a, b) => a.distance - b.distance)
+          .map(x => x.item);
       }
 
-      // Calculate facets and suggestions
+      // Date availability filter (still client-side)
+      if (filters.dateRange) {
+        items = await this.filterByAvailability(items, filters.dateRange);
+      }
+
+      // Verified owners - still a client-side join (fetch minimal owners)
+      if (filters.verifiedOwners) {
+        const ownerIds = Array.from(new Set(items.map(i => i.ownerId)));
+        const verified = new Set<string>();
+        for (const ownerId of ownerIds) {
+          try {
+            const u = await getDoc(doc(db, collections.users, ownerId));
+            if (u.exists()) {
+              const ud = u.data();
+              if (ud.verification?.isVerified) verified.add(ownerId);
+            }
+          } catch (err) {
+            // ignore
+          }
+        }
+        items = items.filter(i => verified.has(i.ownerId));
+      }
+
+      // Min rating filter if not applied server-side
+      if (typeof filters.minRating === 'number') {
+        items = items.filter(i => (i.ratings?.average || 0) >= filters.minRating!);
+      }
+
+      // Apply remaining sorting client-side for fields Firestore couldn't sort by (price when not ordered, relevance, popularity)
+      items = await this.applySorting(items, filters.sortBy || 'relevance', filters.location);
+
+      // Facets and available filters (based on returned items)
       const facets = await this.calculateFacets(items);
       const availableFilters = await this.getAvailableFilters(items);
       const suggestions = await this.generateSuggestions(filters.query || '');
 
       const totalCount = items.length;
-      const hasMore = false; // Simplified for MVP - no pagination
+      const hasMore = snapshot.docs.length === limitCount; // heuristic
 
       return {
         items,
@@ -346,7 +392,7 @@ export class SearchService {
   }
 
   // Filter items by date availability
-  private async filterByAvailability(items: Item[], dateRange: { startDate: Date; endDate: Date }): Promise<Item[]> {
+  private async filterByAvailability(items: Item[], dateRange: { start: Date; end: Date }): Promise<Item[]> {
     // In a real implementation, this would check against booking calendar
     // For now, we'll return all items that are marked as available (simplified)
     return items.filter(item => {
@@ -356,6 +402,51 @@ export class SearchService {
       // Simple check based on availability status
       return item.availability.isAvailable;
     });
+  }
+
+  // Apply sorting to search results
+  private async applySorting(items: Item[], sortBy: string, location?: { latitude: number; longitude: number; radius: number }): Promise<Item[]> {
+    switch (sortBy) {
+      case 'price_low':
+        return items.sort((a, b) => (a.pricing?.dailyRate || 0) - (b.pricing?.dailyRate || 0));
+      
+      case 'price_high':
+        return items.sort((a, b) => (b.pricing?.dailyRate || 0) - (a.pricing?.dailyRate || 0));
+      
+      case 'rating':
+        return items.sort((a, b) => (b.ratings?.average || 0) - (a.ratings?.average || 0));
+      
+      case 'newest':
+        return items.sort((a, b) => {
+          const aDate = a.createdAt?.getTime() || 0;
+          const bDate = b.createdAt?.getTime() || 0;
+          return bDate - aDate;
+        });
+      
+      case 'distance':
+        if (location) {
+          return items.sort((a, b) => {
+            const distanceA = this.calculateDistance(
+              location.latitude,
+              location.longitude,
+              a.location?.latitude || 0,
+              a.location?.longitude || 0
+            );
+            const distanceB = this.calculateDistance(
+              location.latitude,
+              location.longitude,
+              b.location?.latitude || 0,
+              b.location?.longitude || 0
+            );
+            return distanceA - distanceB;
+          });
+        }
+        return items;
+      
+      case 'relevance':
+      default:
+        return await this.applyBoostPrioritization(items);
+    }
   }
 
   // Apply boost prioritization to search results

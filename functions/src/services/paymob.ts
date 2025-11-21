@@ -3,7 +3,7 @@ export class PaymobFunctionsService {
   private static instance: PaymobFunctionsService;
   private authToken: string | null = null;
   private tokenExpiry: number | null = null;
-  
+
   private readonly apiKey: string;
   private readonly integrationId: string;
   private readonly hmacSecret: string;
@@ -17,6 +17,12 @@ export class PaymobFunctionsService {
     this.apiKey = config.apiKey;
     this.integrationId = config.integrationId;
     this.hmacSecret = config.hmacSecret;
+
+    // Debug logging
+    console.log('Paymob service initialized with:');
+    console.log('API Key present:', !!this.apiKey);
+    console.log('Integration ID present:', !!this.integrationId);
+    console.log('HMAC Secret present:', !!this.hmacSecret);
   }
 
   public static initialize(config: {
@@ -45,23 +51,31 @@ export class PaymobFunctionsService {
         return this.authToken;
       }
 
-      const response = await global.fetch(`${this.baseUrl}/auth/tokens`, {
+      console.log('Authenticating with Paymob...');
+      
+      // Try authentication with API key (same as client-side)
+      const requestBody = {
+        api_key: this.apiKey,
+      };
+
+      const response = await fetch(`${this.baseUrl}/auth/tokens`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          api_key: this.apiKey,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Paymob authentication failed:', errorText);
         throw new Error(`Failed to authenticate with Paymob: ${errorText}`);
       }
 
-      const data = await response.json();
-      this.authToken = data.token;
+      const authData = await response.json();
+      console.log('Paymob authentication successful');
+
+      this.authToken = authData.token;
       // Token expires in 1 hour, set expiry to 55 minutes for safety
       this.tokenExpiry = Date.now() + 55 * 60 * 1000;
 
@@ -81,7 +95,7 @@ export class PaymobFunctionsService {
     try {
       const authToken = await this.authenticate();
 
-      const response = await global.fetch(`${this.baseUrl}/ecommerce/orders`, {
+      const response = await fetch(`${this.baseUrl}/ecommerce/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +145,7 @@ export class PaymobFunctionsService {
     try {
       const authToken = await this.authenticate();
 
-      const response = await global.fetch(`${this.baseUrl}/acceptance/payment_keys`, {
+      const response = await fetch(`${this.baseUrl}/acceptance/payment_keys`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -177,7 +191,7 @@ export class PaymobFunctionsService {
   // Retrieve transaction
   public async retrieveTransaction(transactionId: string): Promise<any> {
     try {
-      const response = await global.fetch(
+      const response = await fetch(
         `${this.baseUrl}/acceptance/transactions/${transactionId}`,
         {
           method: 'GET',
@@ -207,7 +221,7 @@ export class PaymobFunctionsService {
     try {
       const authToken = await this.authenticate();
 
-      const response = await global.fetch(`${this.baseUrl}/acceptance/void_refund/refund`, {
+      const response = await fetch(`${this.baseUrl}/acceptance/void_refund/refund`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -240,7 +254,7 @@ export class PaymobFunctionsService {
     try {
       const authToken = await this.authenticate();
 
-      const response = await global.fetch(`${this.baseUrl}/acceptance/void_refund/void`, {
+      const response = await fetch(`${this.baseUrl}/acceptance/void_refund/void`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -271,7 +285,7 @@ export class PaymobFunctionsService {
     try {
       const authToken = await this.authenticate();
 
-      const response = await global.fetch(`${this.baseUrl}/acceptance/capture`, {
+      const response = await fetch(`${this.baseUrl}/acceptance/capture`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -299,7 +313,7 @@ export class PaymobFunctionsService {
   public verifyHMAC(data: any, receivedHMAC: string): boolean {
     try {
       const crypto = require('crypto');
-      
+
       // Concatenate specific fields in Paymob's required order
       const concatenatedString = [
         data.amount_cents,

@@ -63,11 +63,16 @@ service cloud.firestore {
     
     // Rentals collection
     match /rentals/{rentalId} {
+      // Allow reading rentals for availability checking (by itemId)
+      // or if user is involved in the rental
       allow read: if isAuthenticated() && (
         isOwner(resource.data.ownerId) ||
         isOwner(resource.data.renterId) ||
         isAdmin()
       );
+      
+      // Allow querying rentals by itemId for availability (limited fields exposed)
+      allow list: if isAuthenticated();
 
       allow create: if isAuthenticated() &&
         // Check if user is verified by reading their user document
@@ -262,6 +267,14 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
       allow update: if isAuthenticated() && isOwner(resource.data.userId);
       allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // Favorites collection
+    match /favorites/{favoriteId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if false; // Favorites don't need updates, only create/delete
     }
 
     // Search history collection

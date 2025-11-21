@@ -15,6 +15,8 @@ import { useAuthContext } from '../../contexts/AuthContext';
 import { useUserBalance, useUserTransactions } from '../../hooks/useFirestore';
 import { commissionService } from '../../services/commission';
 import { diditKycService } from '../../services/diditKyc';
+import { db, collections } from '../../config/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface CommissionTransaction {
   id: string;
@@ -138,22 +140,118 @@ const WalletScreen: React.FC = () => {
       setCommissionLoading(false);
     }
   };
+  const getTierColor = (tier: string) => {
+    switch (tier) {
+      case 'Bronze': return '#CD7F32';
+      case 'Silver': return '#C0C0C0';
+      case 'Gold': return '#FFD700';
+      case 'Platinum': return '#E5E4E2';
+      default: return '#6B7280';
+    }
+  };
+
+  const getTierIcon = (tier: string) => {
+    switch (tier) {
+      case 'Bronze': return 'medal-outline';
+      case 'Silver': return 'medal-outline';
+      case 'Gold': return 'medal';
+      case 'Platinum': return 'trophy';
+      default: return 'medal-outline';
+    }
+  };
+
+  const [tierInfo, setTierInfo] = useState<{
+    currentTier: string;
+    completedRentals: number;
+    nextTier?: {
+      name: string;
+      rentalsNeeded: number;
+      currentRate: number;
+      nextRate: number;
+    };
+  } | null>(null);
+
+  const [tierLoading, setTierLoading] = useState(false);
+
+  const loadTierInfo = async () => {
+    if (!user) return;
+
+    try {
+      setTierLoading(true);
+      const config = commissionService.getConfig();
+
+      // Get completed rentals count
+      const rentalsQuery = query(
+        collection(db, collections.rentals),
+        where('ownerId', '==', user.uid),
+        where('status', '==', 'completed')
+      );
+      const snapshot = await getDocs(rentalsQuery);
+      const completedRentals = snapshot.size;
+
+      // Determine current tier
+      const sortedTiers = [...config.tierRates].sort((a, b) => b.minRentals - a.minRentals);
+      let currentTier = sortedTiers[sortedTiers.length - 1];
+
+      for (const tier of sortedTiers) {
+        if (completedRentals >= tier.minRentals) {
+          currentTier = tier;
+          break;
+        }
+      }
+
+      // Calculate next tier info
+      const currentTierIndex = config.tierRates.findIndex(t => t.tier === currentTier.tier);
+      let nextTierData;
+
+      if (currentTierIndex < config.tierRates.length - 1) {
+        const nextTier = config.tierRates[currentTierIndex + 1];
+        nextTierData = {
+          name: nextTier.tier,
+          rentalsNeeded: nextTier.minRentals - completedRentals,
+          currentRate: currentTier.commissionRate * 100,
+          nextRate: nextTier.commissionRate * 100,
+        };
+      }
+
+      setTierInfo({
+        currentTier: currentTier.tier,
+        completedRentals,
+        nextTier: nextTierData,
+      });
+    } catch (error) {
+      console.error('Error loading tier info:', error);
+    } finally {
+      setTierLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCommissionHistory();
+    checkKycStatus();
+    loadTierInfo();
+  }, [user]);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Available Balance</Text>
+        {/* Wallet Balance Card */}
+        <View style={styles.walletCard}>
+          <View style={styles.walletHeader}>
+            <Ionicons name="wallet" size={24} color="#FFFFFF" />
+            <Text style={styles.walletTitle}>Wallet Balance</Text>
+          </View>
           {balanceLoading ? (
-            <ActivityIndicator size="large" color="#FFFFFF" style={styles.balanceLoader} />
+            <ActivityIndicator size="large" color="#FFFFFF" style={styles.walletLoader} />
           ) : (
-            <Text style={styles.balanceAmount}>
+            <Text style={styles.walletAmount}>
               EGP {balance.toFixed(2)}
             </Text>
           )}
           {balanceError && (
             <Text style={styles.errorText}>{balanceError}</Text>
           )}
-          <View style={styles.balanceActions}>
+          <View style={styles.walletActions}>
             <Button
               title={kycVerified ? "Withdraw" : "Verify to Withdraw"}
               onPress={handleWithdraw}
@@ -168,6 +266,82 @@ const WalletScreen: React.FC = () => {
             </Text>
           )}
         </View>
+
+        {/* Commission Tier Card */}
+        {tierLoading ? (
+          <View style={styles.tierCard}>
+            <ActivityIndicator size="large" color="#4639eb" />
+          </View>
+        ) : tierInfo && (
+          <View style={styles.tierCard}>
+            <View style={styles.tierHeader}>
+              <Ionicons
+                name={getTierIcon(tierInfo.currentTier) as any}
+                size={32}
+                color={getTierColor(tierInfo.currentTier)}
+              />
+              <View style={styles.tierHeaderText}>
+                <Text style={styles.tierTitle}>Commission Tier</Text>
+                <Text style={[styles.tierName, { color: getTierColor(tierInfo.currentTier) }]}>
+                  {tierInfo.currentTier}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.tierStats}>
+              <View style={styles.tierStat}>
+                <Text style={styles.tierStatNumber}>{tierInfo.completedRentals}</Text>
+                <Text style={styles.tierStatLabel}>Completed Rentals</Text>
+              </View>
+              <View style={styles.tierDivider} />
+              <View style={styles.tierStat}>
+                <Text style={styles.tierStatNumber}>
+                  {tierInfo.nextTier ? `${tierInfo.nextTier.currentRate}%` : '5%'}
+                </Text>
+                <Text style={styles.tierStatLabel}>Commission Rate</Text>
+              </View>
+            </View>
+
+            {tierInfo.nextTier && (
+              <View style={styles.nextTierInfo}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressLabel}>
+                    Progress to {tierInfo.nextTier.name}
+                  </Text>
+                  <Text style={styles.progressValue}>
+                    {tierInfo.nextTier.rentalsNeeded} more rentals
+                  </Text>
+                </View>
+                <View style={styles.progressBar}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${Math.min(
+                          (tierInfo.completedRentals / (tierInfo.completedRentals + tierInfo.nextTier.rentalsNeeded)) * 100,
+                          100
+                        )}%`
+                      }
+                    ]}
+                  />
+                </View>
+                <Text style={styles.nextTierBenefit}>
+                  Unlock {tierInfo.nextTier.nextRate}% commission rate
+                  (save {(tierInfo.nextTier.currentRate - tierInfo.nextTier.nextRate).toFixed(1)}% per rental!)
+                </Text>
+              </View>
+            )}
+
+            {!tierInfo.nextTier && (
+              <View style={styles.maxTierBadge}>
+                <Ionicons name="star" size={16} color="#FFD700" />
+                <Text style={styles.maxTierText}>
+                  You've reached the highest tier! 🎉
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={styles.earningsCard}>
           <Text style={styles.cardTitle}>Earnings Summary</Text>
@@ -670,6 +844,153 @@ const styles = StyleSheet.create({
   rentalIdText: {
     fontSize: 11,
     color: '#9CA3AF',
+  },
+  // Wallet related styles - Balance Card
+  walletCard: {
+    backgroundColor: '#4639eb',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  walletHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  walletTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 12,
+  },
+  walletAmount: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 24,
+  },
+  walletLoader: {
+    marginVertical: 24,
+  },
+  walletActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 8,
+    gap: 16,
+  },
+  // Tier related styles - Commission Tier Card
+  tierCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: '#E0E7FF',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  tierHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  tierHeaderText: {
+    flex: 1,
+  },
+  tierTitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  tierName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  tierStats: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  tierStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  tierDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 16,
+  },
+  tierStatNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4639eb',
+    marginBottom: 4,
+  },
+  tierStatLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  nextTierInfo: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    padding: 12,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  progressValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4639eb',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E0E7FF',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4639eb',
+    borderRadius: 4,
+  },
+  nextTierBenefit: {
+    fontSize: 11,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  maxTierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  maxTierText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
   },
 });
 

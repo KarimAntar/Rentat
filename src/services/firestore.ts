@@ -17,7 +17,8 @@ import {
   QueryDocumentSnapshot,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db, collections } from '../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, collections, functions } from '../config/firebase';
 import { User, Item, Rental, Review, WalletTransaction, Notification } from '../types';
 import { commissionService } from './commission';
 
@@ -273,6 +274,24 @@ export class RentalService extends FirestoreService {
     return this.update<Rental>(collections.rentals, rentalId, data);
   }
 
+  // Update payment status for rental (used by RentalPaymentScreen)
+  static async updateRentalPaymentStatus(rentalId: string, status: 'pending' | 'succeeded' | 'failed'): Promise<void> {
+    try {
+      // Get current rental to preserve other payment fields
+      const rental = await this.getRental(rentalId);
+      if (!rental) throw new Error('Rental not found');
+      await this.update<Rental>(collections.rentals, rentalId, {
+        payment: {
+          ...rental.payment,
+          paymentStatus: status,
+        },
+      });
+    } catch (error) {
+      console.error('Error updating rental payment status:', error);
+      throw error;
+    }
+  }
+
   static async completeRental(rentalId: string): Promise<void> {
     try {
       // Get rental details
@@ -306,10 +325,29 @@ export class RentalService extends FirestoreService {
 
   static async getRentalsByUser(userId: string, asOwner: boolean = false): Promise<Rental[]> {
     const field = asOwner ? 'ownerId' : 'renterId';
-    return this.getMany<Rental>(collections.rentals, [
+    const rentals = await this.getMany<Rental>(collections.rentals, [
       where(field, '==', userId),
       orderBy('createdAt', 'desc')
     ]);
+
+    // Fetch item details for display
+    const rentalsWithDetails = await Promise.all(
+      rentals.map(async (rental) => {
+        try {
+          const item = await ItemService.getItem(rental.itemId);
+          return {
+            ...rental,
+            itemTitle: item?.title,
+            itemImage: item?.images?.[0],
+          } as any;
+        } catch (error) {
+          console.error('Error fetching item details for rental:', rental.id, error);
+          return rental as any;
+        }
+      })
+    );
+
+    return rentalsWithDetails;
   }
 
   static async getRentalsByItem(itemId: string): Promise<Rental[]> {
@@ -328,42 +366,109 @@ export class RentalService extends FirestoreService {
   }
 
   static async getOwnerRentalRequests(ownerId: string): Promise<Rental[]> {
-    return this.getMany<Rental>(collections.rentals, [
+    const rentals = await this.getMany<Rental>(collections.rentals, [
       where('ownerId', '==', ownerId),
       orderBy('createdAt', 'desc')
     ]);
+
+    // Fetch item and user details for each rental
+    const rentalsWithDetails = await Promise.all(
+      rentals.map(async (rental) => {
+        try {
+          // Fetch item details
+          const item = await ItemService.getItem(rental.itemId);
+          // Fetch renter details
+          const renter = await UserService.getUser(rental.renterId);
+
+          return {
+            ...rental,
+            itemTitle: item?.title,
+            itemImage: item?.images?.[0],
+            renterName: renter?.displayName,
+          } as any;
+        } catch (error) {
+          console.error('Error fetching details for rental:', rental.id, error);
+          return rental as any;
+        }
+      })
+    );
+
+    return rentalsWithDetails;
   }
 
   static async approveRental(rentalId: string): Promise<void> {
     try {
-      const rental = await this.getRental(rentalId);
-      if (!rental) {
-        throw new Error('Rental not found');
-      }
-
-      // Update status and confirmed dates separately to comply with Firestore rules
-      await this.update<Rental>(collections.rentals, rentalId, {
-        status: 'approved',
-      });
-
-      // Update confirmed dates using Firestore field paths
-      const docRef = doc(db, collections.rentals, rentalId);
-      await updateDoc(docRef, {
-        'dates.confirmedStart': rental.dates.requestedStart,
-        'dates.confirmedEnd': rental.dates.requestedEnd,
-        updatedAt: serverTimestamp(),
-      });
-
+      // Use backend callable function to perform approval (avoids client-side security rule issues)
+      const callable = httpsCallable(functions, 'processRentalResponse');
+      await callable({ rentalId, action: 'approve' });
     } catch (error) {
-      console.error('Error approving rental:', error);
+      console.error('Error approving rental via cloud function:', error);
       throw error;
     }
   }
 
   static async rejectRental(rentalId: string): Promise<void> {
-    return this.update<Rental>(collections.rentals, rentalId, {
-      status: 'rejected',
-    });
+    try {
+      const callable = httpsCallable(functions, 'processRentalResponse');
+      await callable({ rentalId, action: 'reject' });
+    } catch (error) {
+      console.error('Error rejecting rental via cloud function:', error);
+      throw error;
+    }
+  }
+
+  // Confirm item received by renter
+  static async confirmItemReceived(rentalId: string): Promise<void> {
+    try {
+      const callable = httpsCallable(functions, 'confirmItemReceived');
+      await callable({ rentalId });
+    } catch (error) {
+      console.error('Error confirming item received:', error);
+      throw error;
+    }
+  }
+
+  // Confirm item returned by owner with optional damage report
+  static async confirmItemReturned(
+    rentalId: string,
+    damageReport?: {
+      hasDamage: boolean;
+      description: string;
+      images: string[];
+      deductionAmount: number;
+    }
+  ): Promise<void> {
+    try {
+      const callable = httpsCallable(functions, 'confirmItemReturned');
+      await callable({ rentalId, damageReport });
+    } catch (error) {
+      console.error('Error confirming item returned:', error);
+      throw error;
+    }
+  }
+
+  // Refresh payment key for rental - creates fresh payment session
+  static async refreshPaymentKey(rentalId: string): Promise<{ success: boolean; paymentKey: string; orderId: string }> {
+    try {
+      const callable = httpsCallable(functions, 'refreshPaymentKey');
+      const result = await callable({ rentalId });
+      return result.data as { success: boolean; paymentKey: string; orderId: string };
+    } catch (error) {
+      console.error('Error refreshing payment key:', error);
+      throw error;
+    }
+  }
+
+  // Request payout - Owner requests withdrawal from wallet
+  static async requestPayout(amount: number, method: 'bank_transfer' | 'mobile_wallet'): Promise<{ payoutRequestId: string; estimatedProcessingTime: string }> {
+    try {
+      const callable = httpsCallable(functions, 'requestPayout');
+      const result = await callable({ amount, method });
+      return result.data as { payoutRequestId: string; estimatedProcessingTime: string };
+    } catch (error) {
+      console.error('Error requesting payout:', error);
+      throw error;
+    }
   }
 
   static subscribeToUserRentals(

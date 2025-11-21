@@ -279,7 +279,8 @@ export class ChatService {
       participants
         .filter((uid) => uid !== senderId)
         .forEach((uid) => {
-          updates[`metadata.unreadCount.${uid}`] = increment(1);
+          const currentUnread = chatData.metadata?.unreadCount?.[uid] || 0;
+          updates[`metadata.unreadCount.${uid}`] = currentUnread + 1;
         });
       // Reset sender unread to 0 to avoid own unread increments
       updates[`metadata.unreadCount.${senderId}`] = 0;

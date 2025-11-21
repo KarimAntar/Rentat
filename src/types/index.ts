@@ -245,7 +245,7 @@ export interface Rental {
   timeline: RentalTimelineEvent[];
 }
 
-export type RentalStatus = 'pending' | 'approved' | 'rejected' | 'active' | 'completed' | 'cancelled' | 'disputed';
+export type RentalStatus = 'pending' | 'approved' | 'rejected' | 'declined' | 'active' | 'completed' | 'cancelled' | 'disputed';
 
 export interface RentalDates {
   requestedStart: Date;
@@ -271,6 +271,7 @@ export interface RentalPayment {
   // Paymob fields (new)
   paymobOrderId?: string;
   paymobTransactionId?: string;
+  paymobPaymentKey?: string;
 
   // Stripe fields (legacy - kept for backward compatibility)
   stripePaymentIntentId?: string;
@@ -280,11 +281,19 @@ export interface RentalPayment {
   depositStatus: DepositStatus;
   payoutStatus: PayoutStatus;
   refundAmount?: number;
+  
+  // Escrow payment tracking
+  escrow?: {
+    totalHeld: number; // Total amount held in escrow
+    depositAmount: number;
+    ownerPayout: number; // Calculated on completion
+    platformFee: number;
+  };
 }
 
 export type PaymentStatus = 'pending' | 'succeeded' | 'failed' | 'refunded';
 export type DepositStatus = 'held' | 'released' | 'claimed';
-export type PayoutStatus = 'pending' | 'processing' | 'completed';
+export type PayoutStatus = 'pending' | 'requested' | 'processing' | 'completed';
 
 export interface RentalDelivery {
   method: 'pickup' | 'delivery' | 'meet-in-middle';
@@ -307,8 +316,31 @@ export interface RentalCommunication {
 export interface RentalCompletion {
   ownerConfirmed?: boolean;
   renterConfirmed?: boolean;
+  itemReceived?: {
+    confirmed: boolean;
+    confirmedAt?: Date;
+    confirmedBy?: string;
+  };
+  itemReturned?: {
+    renterConfirmed: boolean;
+    renterConfirmedAt?: Date;
+    ownerConfirmed: boolean;
+    ownerConfirmedAt?: Date;
+    damageReport?: DamageReport;
+  };
   damageReported?: DamageReport;
   completedAt?: Date;
+  refund?: {
+    status: 'pending' | 'processed' | 'rejected';
+    amount: number;
+    processedAt?: Date;
+  };
+  payout?: {
+    status: 'pending' | 'requested' | 'processed';
+    amount: number;
+    requestedAt?: Date;
+    processedAt?: Date;
+  };
 }
 
 export interface DamageReport {
@@ -316,6 +348,8 @@ export interface DamageReport {
   description: string;
   images: string[];
   amount?: number;
+  hasDamage: boolean;
+  deductionAmount?: number; // Amount to deduct from deposit
 }
 
 export interface RentalCancellation {
@@ -493,7 +527,7 @@ export interface Notification {
   readAt?: Date;
 }
 
-export type NotificationType = 'rental_request' | 'rental_approved' | 'rental_rejected' | 'message' | 'review' | 'payment' | 'reminder' | 'system';
+export type NotificationType = 'rental_request' | 'rental_approved' | 'rental_rejected' | 'rental_payment_required' | 'rental_confirmed' | 'message' | 'review' | 'payment' | 'reminder' | 'system';
 export type NotificationStatus = 'unread' | 'read' | 'archived';
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -544,10 +578,14 @@ export interface SearchFilters {
     latitude: number;
     longitude: number;
     radius: number;
+    city?: string;
+    state?: string;
+    country?: string;
   };
   priceRange?: {
-    min: number;
-    max: number;
+    min?: number;
+    max?: number;
+    currency?: string;
   };
   dateRange?: {
     start: Date;
@@ -555,7 +593,14 @@ export interface SearchFilters {
   };
   condition?: ItemCondition[];
   features?: string[];
-  sortBy?: 'relevance' | 'price_low' | 'price_high' | 'distance' | 'rating' | 'newest';
+  availability?: 'available' | 'busy' | 'unavailable';
+  deliveryOptions?: ('pickup' | 'delivery' | 'meetup')[];
+  minRating?: number;
+  verifiedOwners?: boolean;
+  instantBooking?: boolean;
+  sortBy?: 'relevance' | 'price_low' | 'price_high' | 'distance' | 'rating' | 'newest' | 'popular';
+  limit?: number;
+  offset?: number;
 }
 
 export interface SearchResult {
@@ -667,6 +712,11 @@ export type RootStackParamList = {
   Search: { filters?: Partial<SearchFilters> };
   Map: { filters?: Partial<SearchFilters> };
   PaymobTest: undefined;
+  Favorites: undefined;
+  Notifications: undefined;
+  Orders: undefined;
+  OrderDetails: { rentalId: string };
+  RentalPayment: { rentalId: string };
 };
 
 export type AuthStackParamList = {
@@ -680,6 +730,7 @@ export type MainTabParamList = {
   Home: undefined;
   Search: undefined;
   AddItem: undefined;
+  Orders: undefined;
   Messages: undefined;
   Account: undefined;
 };

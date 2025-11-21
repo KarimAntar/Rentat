@@ -28,6 +28,7 @@ import RentalRequestsScreen from '../screens/main/RentalRequestsScreen';
 import MyListingsScreen from '../screens/main/MyListingsScreen';
 import RentalHistoryScreen from '../screens/main/RentalHistoryScreen';
 import HelpSupportScreen from '../screens/main/HelpSupportScreen';
+import FavoritesScreen from '../screens/main/FavoritesScreen';
 import LoadingScreen from '../components/LoadingScreen';
 import PWAInstallPrompt from '../components/PWAInstallPrompt';
 
@@ -86,30 +87,6 @@ const AuthNavigator: React.FC = () => {
 // Custom Tab Bar Component - Shows different tabs based on auth status
 const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
   const { user } = useAuthContext();
-  const [unreadCount, setUnreadCount] = React.useState(0);
-
-  // Subscribe to unread messages count
-  React.useEffect(() => {
-    if (!user) return;
-
-    const chatsQuery = query(
-      collection(db, collections.chats),
-      where('participants', 'array-contains', user.uid),
-      orderBy('updatedAt', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(chatsQuery, (snapshot) => {
-      let totalUnread = 0;
-      snapshot.docs.forEach((doc) => {
-        const chatData = doc.data();
-        const unreadForUser = chatData.metadata?.unreadCount?.[user.uid] || 0;
-        totalUnread += unreadForUser;
-      });
-      setUnreadCount(totalUnread);
-    });
-
-    return unsubscribe;
-  }, [user]);
 
   // Define tabs based on authentication status
   const getTabs = () => {
@@ -117,16 +94,17 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
       // Visitor tabs: Home | Search | Sign in
       return [
         { name: 'Home', label: 'Home', icon: 'home' },
-        { name: 'Search', label: 'Search', icon: 'search' },
+        { name: 'Search', label: 'Search', icon: 'sign-in' },
         { name: 'SignIn', label: 'Sign in', icon: 'log-in' }
       ];
     } else {
-      // Authenticated user tabs: Home | Search | Add Item | Messages | Account
+      // Authenticated user tabs: Home | Search | Messages | Add Item | Orders | Account
       return [
         { name: 'Home', label: 'Home', icon: 'home' },
         { name: 'Search', label: 'Search', icon: 'search' },
-        { name: 'AddItem', label: 'Add Item', icon: 'add-circle' },
         { name: 'Messages', label: 'Messages', icon: 'chatbubble' },
+        { name: 'AddItem', label: 'Add Item', icon: 'add-circle' },
+        { name: 'Orders', label: 'Orders', icon: 'receipt' },
         { name: 'Account', label: 'Account', icon: 'person' }
       ];
     }
@@ -169,7 +147,7 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
             }
 
             // Check if user needs to be authenticated for this tab
-            const requiresAuth = ['AddItem', 'Messages', 'Profile'].includes(tab.name);
+            const requiresAuth = ['AddItem', 'Profile'].includes(tab.name);
 
             if (requiresAuth && !user) {
               // Navigate to auth stack instead of the protected tab
@@ -207,13 +185,6 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
                 size={isFocused ? 24 : 22}
                 color={isFocused ? '#4639eb' : '#6B7280'}
               />
-              {tab.name === 'Messages' && unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadBadgeText}>
-                    {unreadCount > 99 ? '99+' : unreadCount.toString()}
-                  </Text>
-                </View>
-              )}
             </View>
             <Text
               style={[
@@ -235,7 +206,46 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
 
 // Global Header Component
 const GlobalHeader: React.FC<{ title?: string; navigation?: any }> = ({ title, navigation }) => {
-  const { signOut } = useAuthContext();
+  const { signOut, user } = useAuthContext();
+  const [unreadNotifications, setUnreadNotifications] = React.useState(0);
+  const [unreadMessages, setUnreadMessages] = React.useState(0);
+
+  // Subscribe to unread notifications count
+  React.useEffect(() => {
+    if (!user) return;
+
+    const notificationsQuery = query(
+      collection(db, collections.notifications),
+      where('userId', '==', user.uid),
+      where('status', '==', 'unread')
+    );
+
+    const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+      setUnreadNotifications(snapshot.size);
+    });
+
+    // Subscribe to unread messages count
+    const chatsQuery = query(
+      collection(db, collections.chats),
+      where('participants', 'array-contains', user.uid),
+      orderBy('updatedAt', 'desc')
+    );
+
+    const unsubscribeMessages = onSnapshot(chatsQuery, (snapshot) => {
+      let totalUnread = 0;
+      snapshot.docs.forEach((doc) => {
+        const chatData = doc.data();
+        const unreadForUser = chatData.metadata?.unreadCount?.[user.uid] || 0;
+        totalUnread += unreadForUser;
+      });
+      setUnreadMessages(totalUnread);
+    });
+
+    return () => {
+      unsubscribeNotifications();
+      unsubscribeMessages();
+    };
+  }, [user]);
 
   const handleSignOut = async () => {
     try {
@@ -255,8 +265,34 @@ const GlobalHeader: React.FC<{ title?: string; navigation?: any }> = ({ title, n
         <UserGreeting avatarSize={48} />
       </View>
       <View style={styles.headerActions}>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => {
+            const parentNavigation = navigation?.getParent?.();
+            parentNavigation?.navigate('Messages');
+          }}
+        >
+          <Ionicons name="chatbubble-outline" size={24} color="#6B7280" />
+          {unreadMessages > 0 && (
+            <View style={[styles.notificationBadge, { top: -4, right: -4 }]}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadMessages > 99 ? '99+' : unreadMessages.toString()}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation?.navigate('Notifications')}
+        >
           <Ionicons name="notifications-outline" size={24} color="#6B7280" />
+          {unreadNotifications > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadNotifications > 9 ? '9+' : unreadNotifications.toString()}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity onPress={handleSignOut} style={styles.actionButton}>
           <Ionicons name="log-out-outline" size={24} color="#6B7280" />
@@ -271,8 +307,15 @@ const MainNavigator: React.FC = () => {
   return (
     <MainTab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{
-        header: (props) => <GlobalHeader title={props.options.title} navigation={props.navigation} />,
+      screenOptions={({ route, navigation }) => {
+        return {
+          header:
+            route.name === 'Home'
+              ? undefined // Use HomeScreen's own header, not GlobalHeader
+              : route.name === 'Search' || route.name === 'Account'
+              ? undefined // Use SearchScreen and ProfileScreen's own TabHeader, not GlobalHeader
+              : (props) => <GlobalHeader title={route.name} navigation={navigation} />,
+        };
       }}
     >
       <MainTab.Screen
@@ -280,7 +323,7 @@ const MainNavigator: React.FC = () => {
         component={HomeScreen}
         options={{
           title: 'Home',
-          headerShown: false, // Hide header for home screen since it has its own greeting
+          headerShown: false,
         }}
       />
       <MainTab.Screen
@@ -288,6 +331,7 @@ const MainNavigator: React.FC = () => {
         component={SearchScreen}
         options={{
           title: 'Search',
+          headerShown: false,
         }}
       />
       <MainTab.Screen
@@ -298,22 +342,34 @@ const MainNavigator: React.FC = () => {
         }}
       />
       <MainTab.Screen
+        name="Orders"
+        component={require('../screens/main/OrdersScreen').default}
+        options={{
+          title: 'Orders',
+        }}
+      />
+
+      <MainTab.Screen
         name="Messages"
         component={require('../screens/main/MessagesScreen').default}
         options={{
           title: 'Messages',
         }}
       />
+
       <MainTab.Screen
         name="Account"
         component={ProfileScreen}
         options={{
           title: 'Account',
+          headerShown: false,
         }}
       />
     </MainTab.Navigator>
   );
 };
+
+
 
 // Linking configuration for web URLs and deep links
 const linking: LinkingOptions<RootStackParamList> = {
@@ -429,6 +485,31 @@ const AppNavigator: React.FC = () => {
         <RootStack.Screen
           name="PaymobTest"
           component={require('../screens/main/PaymobTestScreen').default}
+          options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="Favorites"
+          component={FavoritesScreen}
+          options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="Notifications"
+          component={require('../screens/main/NotificationsScreen').default}
+          options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="Orders"
+          component={require('../screens/main/OrdersScreen').default}
+          options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="Wallet"
+          component={require('../screens/main/WalletScreen').default}
+          options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="RentalPayment"
+          component={require('../screens/main/RentalPaymentScreen').default}
           options={{ headerShown: false }}
         />
       </RootStack.Navigator>
@@ -578,6 +659,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+    paddingHorizontal: 4,
   },
 });
 

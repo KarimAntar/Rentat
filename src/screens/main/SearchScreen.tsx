@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import Slider from '@react-native-community/slider';
 
 
 type RootStackParamList = {
@@ -32,16 +33,16 @@ import { CATEGORIES, searchCategories } from '../../data/categories';
 import { getGovernorateById } from '../../data/governorates';
 import { searchService, SearchResult, SearchSuggestion, SearchFilters } from '../../services/search';
 import { useAuthContext } from '../../contexts/AuthContext';
-import { useUserProfile } from '../../services/userProfile';
+import { favoritesService } from '../../services/favorites';
 import { locationService } from '../../services/location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import TabHeader from '../../components/TabHeader';
 
 
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user } = useAuthContext();
-  const { addToFavorites, removeFromFavorites, isItemFavorited } = useUserProfile();
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,18 +56,40 @@ const SearchScreen: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
 
-  const [filters, setFilters] = useState<Partial<SearchFilters>>({
+  const [filters, setFilters] = useState<SearchFilters>({
     sortBy: 'relevance',
+    priceRange: { min: 0, max: 10000 },
+    availability: 'available',
+    limit: 30,
   });
 
 
 
-  // Load trending searches, recent searches, and favorites on mount
+  // Load trending searches, recent searches, favorites and persisted filters on mount
   useEffect(() => {
     loadTrendingSearches();
     loadRecentSearches();
     loadUserFavorites();
+    loadPersistedFilters();
   }, [user]);
+
+  // Load persisted filters from AsyncStorage (if any)
+  const loadPersistedFilters = async () => {
+    try {
+      const raw = await AsyncStorage.getItem('searchFilters');
+      if (raw) {
+        const parsed = JSON.parse(raw) as SearchFilters;
+        // ensure sensible defaults if missing
+        setFilters(prev => ({ ...prev, ...parsed }));
+        // if category comes from persisted filters, apply it
+        if (parsed.category) {
+          setSelectedCategory(parsed.category);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading persisted filters:', error);
+    }
+  };
 
   // Debounced search effect
   useEffect(() => {
@@ -82,10 +105,21 @@ const SearchScreen: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  // Search when filters change
+  // Search when filters change (debounced)
   useEffect(() => {
-    performSearch();
-  }, [selectedCategory, filters]);
+    const timeoutId = setTimeout(() => {
+      performSearch();
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [selectedCategory, filters.sortBy, filters.priceRange, filters.condition, filters.location, filters.dateRange, filters.verifiedOwners, filters.instantBooking]);
+
+  // Refresh data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      performSearch();
+      loadUserFavorites();
+    }, [])
+  );
 
   const loadTrendingSearches = async () => {
     try {
@@ -121,8 +155,8 @@ const SearchScreen: React.FC = () => {
     if (!user) return;
 
     try {
-      const userFavorites = await useUserProfile().getUserFavorites(user.uid);
-      setFavorites(new Set(userFavorites));
+      const userFavorites = await favoritesService.getUserFavorites(user.uid);
+      setFavorites(new Set(userFavorites.map(fav => fav.itemId)));
     } catch (error) {
       console.error('Error loading user favorites:', error);
     }
@@ -135,15 +169,13 @@ const SearchScreen: React.FC = () => {
     }
 
     try {
-      const isFavorited = favorites.has(itemId);
+      const newStatus = await favoritesService.toggleFavorite(user.uid, itemId);
       const newFavorites = new Set(favorites);
 
-      if (isFavorited) {
-        await removeFromFavorites(user.uid, itemId);
-        newFavorites.delete(itemId);
-      } else {
-        await addToFavorites(user.uid, itemId);
+      if (newStatus) {
         newFavorites.add(itemId);
+      } else {
+        newFavorites.delete(itemId);
       }
 
       setFavorites(newFavorites);
@@ -170,7 +202,19 @@ const SearchScreen: React.FC = () => {
       const searchFilters: SearchFilters = {
         query: searchQuery || undefined,
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        subcategory: filters.subcategory,
         sortBy: filters.sortBy || 'relevance',
+        priceRange: filters.priceRange,
+        condition: filters.condition,
+        location: filters.location,
+        dateRange: filters.dateRange,
+        verifiedOwners: filters.verifiedOwners,
+        instantBooking: filters.instantBooking,
+        availability: filters.availability,
+        deliveryOptions: filters.deliveryOptions,
+        minRating: filters.minRating,
+        limit: filters.limit || 30,
+        lastDocumentId: filters.lastDocumentId,
       };
 
       const result = await searchService.search(searchFilters);
@@ -215,7 +259,7 @@ const SearchScreen: React.FC = () => {
           {item.title}
         </Text>
         <Text style={styles.itemCategory}>
-          {CATEGORIES.find(c => c.id === item.category)?.name || item.category}
+          Min {item.availability?.minRentalDays || 1} days • Max {item.availability?.maxRentalDays || 30} days
         </Text>
         <View style={styles.itemPricing}>
           <Text style={styles.itemPrice}>
@@ -312,23 +356,103 @@ const SearchScreen: React.FC = () => {
     </View>
   );
 
-  const AdvancedFilterModal = () => {
-    const [tempFilters, setTempFilters] = useState<Partial<SearchFilters>>(filters);
+    const AdvancedFilterModal = () => {
+    const [tempFilters, setTempFilters] = useState<SearchFilters>(filters);
+    const [showDatePicker, setShowDatePicker] = useState<'start' | 'end' | null>(null);
 
-    const handleApplyFilters = () => {
-      setFilters(tempFilters);
+    // sync modal tempFilters with current filters each time modal opens or filters change
+    useEffect(() => {
+      if (showAdvancedFilters) {
+        setTempFilters(filters);
+      }
+    }, [showAdvancedFilters, filters]);
+
+    const handleApplyFilters = async () => {
+      try {
+        // Normalize priceRange and clamp values
+        const normalizedPrice = {
+          min: tempFilters.priceRange?.min ?? 0,
+          max: tempFilters.priceRange?.max ?? 10000,
+          currency: tempFilters.priceRange?.currency,
+        };
+        if (normalizedPrice.min > normalizedPrice.max) {
+          normalizedPrice.max = normalizedPrice.min;
+        }
+
+        const normalized = {
+          ...tempFilters,
+          priceRange: normalizedPrice,
+        };
+
+        await AsyncStorage.setItem('searchFilters', JSON.stringify(normalized));
+      } catch (e) {
+        console.error('Error saving filters:', e);
+      }
+
+      // Apply filters and persist selected category if provided
+      setFilters(prev => ({
+        ...prev,
+        ...tempFilters,
+        priceRange: {
+          min: tempFilters.priceRange?.min ?? 0,
+          max: tempFilters.priceRange?.max ?? 10000,
+          currency: tempFilters.priceRange?.currency,
+        },
+      }));
+
+      if (tempFilters.category) {
+        setSelectedCategory(tempFilters.category as any);
+      }
+
       setShowAdvancedFilters(false);
+
+      // Trigger an immediate search after applying filters
+      performSearch();
     };
 
-    const handleResetFilters = () => {
-      const resetFilters: Partial<SearchFilters> = { sortBy: 'relevance' };
+    const handleResetFilters = async () => {
+      const resetFilters: SearchFilters = { 
+        sortBy: 'relevance',
+        priceRange: { min: 0, max: 10000 }
+      };
       setTempFilters(resetFilters);
       setFilters(resetFilters);
+      try {
+        await AsyncStorage.removeItem('searchFilters');
+      } catch (e) {
+        console.error('Error clearing filters:', e);
+      }
       setShowAdvancedFilters(false);
     };
 
     const updateTempFilter = (key: keyof SearchFilters, value: any) => {
       setTempFilters(prev => ({ ...prev, [key]: value }));
+    };
+
+    const handleGetLocation = async () => {
+      try {
+        const location = await locationService.getCurrentLocation();
+        if (location) {
+          updateTempFilter('location', {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            radius: 10, // Default 10km radius
+          });
+          Alert.alert('Success', 'Location set to your current location');
+        }
+      } catch (error) {
+        console.error('Error getting location:', error);
+        Alert.alert('Error', 'Failed to get your location. Please check your location permissions.');
+      }
+    };
+
+    const formatCurrency = (value: number) => {
+      return `EGP ${value.toLocaleString()}`;
+    };
+
+    const formatDate = (date?: Date) => {
+      if (!date) return 'Select date';
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     return (
@@ -353,32 +477,146 @@ const SearchScreen: React.FC = () => {
           </View>
 
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {/* Price Range */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Price Range (Daily Rate)</Text>
+              <View style={styles.priceRangeContainer}>
+                <Text style={styles.priceText}>{formatCurrency(tempFilters.priceRange?.min || 0)}</Text>
+                <Text style={styles.priceText}>{formatCurrency(tempFilters.priceRange?.max || 10000)}</Text>
+              </View>
+              <View style={styles.sliderContainer}>
+                <Text style={styles.sliderLabel}>Min: {formatCurrency(tempFilters.priceRange?.min || 0)}</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={10000}
+                  step={100}
+                  value={tempFilters.priceRange?.min || 0}
+                  onValueChange={(value) => {
+                    updateTempFilter('priceRange', {
+                      min: value,
+                      max: tempFilters.priceRange?.max || 10000
+                    });
+                  }}
+                  minimumTrackTintColor="#4639eb"
+                  maximumTrackTintColor="#D1D5DB"
+                  thumbTintColor="#4639eb"
+                />
+              </View>
+              <View style={styles.sliderContainer}>
+                <Text style={styles.sliderLabel}>Max: {formatCurrency(tempFilters.priceRange?.max || 10000)}</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={10000}
+                  step={100}
+                  value={tempFilters.priceRange?.max || 10000}
+                  onValueChange={(value) => {
+                    updateTempFilter('priceRange', {
+                      min: tempFilters.priceRange?.min || 0,
+                      max: value
+                    });
+                  }}
+                  minimumTrackTintColor="#4639eb"
+                  maximumTrackTintColor="#D1D5DB"
+                  thumbTintColor="#4639eb"
+                />
+              </View>
+            </View>
+
+            {/* Location & Distance */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Location</Text>
+              <TouchableOpacity style={styles.locationButton} onPress={handleGetLocation}>
+                <Ionicons name="location" size={20} color="#4639eb" />
+                <Text style={styles.locationButtonText}>
+                  {tempFilters.location ? 'Update Location' : 'Use My Location'}
+                </Text>
+              </TouchableOpacity>
+              {tempFilters.location && (
+                <View style={styles.distanceContainer}>
+                  <Text style={styles.distanceLabel}>
+                    Radius: {tempFilters.location.radius || 10} km
+                  </Text>
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={1}
+                    maximumValue={50}
+                    step={1}
+                    value={tempFilters.location.radius || 10}
+                    onValueChange={(value) => {
+                      updateTempFilter('location', {
+                        ...tempFilters.location!,
+                        radius: value
+                      });
+                    }}
+                    minimumTrackTintColor="#4639eb"
+                    maximumTrackTintColor="#D1D5DB"
+                    thumbTintColor="#4639eb"
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Date Range */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Availability</Text>
+              <View style={styles.dateContainer}>
+                <TouchableOpacity 
+                  style={styles.dateButton}
+                  onPress={() => setShowDatePicker('start')}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#6B7280" />
+                  <Text style={styles.dateButtonText}>
+                    {formatDate(tempFilters.dateRange?.start)}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.dateButton}
+                  onPress={() => setShowDatePicker('end')}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#6B7280" />
+                  <Text style={styles.dateButtonText}>
+                    {formatDate(tempFilters.dateRange?.end)}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {tempFilters.dateRange && (
+                <TouchableOpacity
+                  style={styles.clearDatesButton}
+                  onPress={() => updateTempFilter('dateRange', undefined)}
+                >
+                  <Text style={styles.clearDatesText}>Clear Dates</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             {/* Condition */}
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Condition</Text>
               <View style={styles.conditionContainer}>
-                {(['new', 'excellent', 'good', 'fair'] as const).map((condition) => (
+                {(['new', 'like-new', 'good', 'fair', 'poor'] as const).map((condition) => (
                   <TouchableOpacity
                     key={condition}
                     style={[
                       styles.conditionChip,
-                      tempFilters.condition?.includes(condition) && styles.conditionChipActive
+                      tempFilters.condition?.includes(condition as any) && styles.conditionChipActive
                     ]}
                     onPress={() => {
                       const currentConditions = tempFilters.condition || [];
-                      const newConditions = currentConditions.includes(condition)
+                      const newConditions = currentConditions.includes(condition as any)
                         ? currentConditions.filter(c => c !== condition)
-                        : [...currentConditions, condition];
+                        : [...currentConditions, condition as any];
                       updateTempFilter('condition', newConditions);
                     }}
                   >
                     <Text
                       style={[
                         styles.conditionText,
-                        tempFilters.condition?.includes(condition) && styles.conditionTextActive
+                        tempFilters.condition?.includes(condition as any) && styles.conditionTextActive
                       ]}
                     >
-                      {condition.charAt(0).toUpperCase() + condition.slice(1)}
+                      {condition === 'like-new' ? 'Like New' : condition.charAt(0).toUpperCase() + condition.slice(1)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -387,26 +625,44 @@ const SearchScreen: React.FC = () => {
 
             {/* Additional Filters */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Additional Filters</Text>
-              <View style={styles.additionalFilters}>
-                <TouchableOpacity
-                  style={styles.filterOption}
-                  onPress={() => updateTempFilter('verifiedOwners', !tempFilters.verifiedOwners)}
-                >
-                  <View style={styles.checkbox}>
-                    {tempFilters.verifiedOwners && <Ionicons name="checkmark" size={16} color="#4639eb" />}
-                  </View>
-                  <Text style={styles.filterOptionText}>Verified owners only</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.filterOption}
-                  onPress={() => updateTempFilter('instantBooking', !tempFilters.instantBooking)}
-                >
-                  <View style={styles.checkbox}>
-                    {tempFilters.instantBooking && <Ionicons name="checkmark" size={16} color="#4639eb" />}
-                  </View>
-                  <Text style={styles.filterOptionText}>Instant booking</Text>
-                </TouchableOpacity>
+              <Text style={styles.filterSectionTitle}>Availability</Text>
+              <View style={styles.conditionContainer}>
+                {(['available','busy','unavailable'] as const).map((a) => (
+                  <TouchableOpacity
+                    key={a}
+                    style={[
+                      styles.conditionChip,
+                      tempFilters.availability === a && styles.conditionChipActive
+                    ]}
+                    onPress={() => {
+                      updateTempFilter('availability', tempFilters.availability === a ? undefined : a);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.conditionText,
+                        tempFilters.availability === a && styles.conditionTextActive
+                      ]}
+                    >
+                      {a === 'available' ? 'Available' : a === 'busy' ? 'Busy' : 'Unavailable'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Additional Filters</Text>
+                <View style={styles.additionalFilters}>
+                  <TouchableOpacity
+                    style={styles.filterOption}
+                    onPress={() => updateTempFilter('verifiedOwners', !tempFilters.verifiedOwners)}
+                  >
+                    <View style={styles.checkbox}>
+                      {tempFilters.verifiedOwners && <Ionicons name="checkmark" size={16} color="#4639eb" />}
+                    </View>
+                    <Text style={styles.filterOptionText}>Verified owners only</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
 
@@ -452,21 +708,111 @@ const SearchScreen: React.FC = () => {
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.applyButton}
-              onPress={handleApplyFilters}
-            >
-              <Text style={styles.applyButtonText}>Apply Filters</Text>
-            </TouchableOpacity>
-          </View>
+                    style={styles.applyButton}
+                    onPress={handleApplyFilters}
+                  >
+                    <Text style={styles.applyButtonText}>Apply Filters</Text>
+                  </TouchableOpacity>
+                </View>
 
-
-        </SafeAreaView>
-      </Modal>
-    );
-  };
+                {/* Date Picker Modal */}
+                {showDatePicker && (
+                  <Modal
+                    visible={true}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setShowDatePicker(null)}
+                  >
+                    <View style={styles.datePickerOverlay}>
+                      <View style={styles.datePickerContainer}>
+                        <Text style={styles.datePickerTitle}>
+                          Select {showDatePicker === 'start' ? 'Start' : 'End'} Date
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.datePickerButton}
+                          onPress={() => {
+                            const selectedDate = new Date();
+                            if (showDatePicker === 'start') {
+                              updateTempFilter('dateRange', {
+                                ...tempFilters.dateRange,
+                                start: selectedDate
+                              });
+                            } else {
+                              updateTempFilter('dateRange', {
+                                ...tempFilters.dateRange,
+                                end: selectedDate
+                              });
+                            }
+                            setShowDatePicker(null);
+                          }}
+                        >
+                          <Text style={styles.datePickerButtonText}>Today</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.datePickerButton}
+                          onPress={() => {
+                            const tomorrow = new Date();
+                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            if (showDatePicker === 'start') {
+                              updateTempFilter('dateRange', {
+                                ...tempFilters.dateRange,
+                                start: tomorrow
+                              });
+                            } else {
+                              updateTempFilter('dateRange', {
+                                ...tempFilters.dateRange,
+                                end: tomorrow
+                              });
+                            }
+                            setShowDatePicker(null);
+                          }}
+                        >
+                          <Text style={styles.datePickerButtonText}>Tomorrow</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.datePickerButton}
+                          onPress={() => {
+                            const nextWeek = new Date();
+                            nextWeek.setDate(nextWeek.getDate() + 7);
+                            if (showDatePicker === 'start') {
+                              updateTempFilter('dateRange', {
+                                ...tempFilters.dateRange,
+                                start: nextWeek
+                              });
+                            } else {
+                              updateTempFilter('dateRange', {
+                                ...tempFilters.dateRange,
+                                end: nextWeek
+                              });
+                            }
+                            setShowDatePicker(null);
+                          }}
+                        >
+                          <Text style={styles.datePickerButtonText}>Next Week</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.datePickerButton, styles.cancelButton]}
+                          onPress={() => setShowDatePicker(null)}
+                        >
+                          <Text style={styles.cancelButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </Modal>
+                )}
+              </SafeAreaView>
+            </Modal>
+          );
+        };
 
   return (
     <SafeAreaView style={styles.container}>
+      <TabHeader 
+        showGreeting={true}
+        showMessages={true}
+        showNotifications={true}
+        showSignOut={false}
+      />
       {/* Search Header */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -581,16 +927,74 @@ const SearchScreen: React.FC = () => {
       {showFilters && (
         <View style={styles.quickFilters}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <TouchableOpacity style={styles.quickFilter}>
+            <TouchableOpacity
+              style={styles.quickFilter}
+              onPress={() => {
+                // Under EGP 20 quick filter
+                setFilters(prev => ({
+                  ...prev,
+                  priceRange: { min: 0, max: 20 },
+                }));
+                performSearch();
+              }}
+            >
               <Text style={styles.quickFilterText}>Under EGP 20</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickFilter}>
+
+            <TouchableOpacity
+              style={styles.quickFilter}
+              onPress={async () => {
+                // Nearby quick filter - use current location with default radius 10km
+                try {
+                  const loc = await locationService.getCurrentLocation();
+                  if (loc) {
+                    setFilters(prev => ({
+                      ...prev,
+                      location: { latitude: loc.latitude, longitude: loc.longitude, radius: 10 },
+                      sortBy: 'distance',
+                    }));
+                    performSearch();
+                  } else {
+                    Alert.alert('Location unavailable', 'Could not obtain your location.');
+                  }
+                } catch (err) {
+                  console.error('Error getting location for Nearby quick filter:', err);
+                  Alert.alert('Error', 'Failed to get your location.');
+                }
+              }}
+            >
               <Text style={styles.quickFilterText}>Nearby</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickFilter}>
+
+            <TouchableOpacity
+              style={styles.quickFilter}
+              onPress={() => {
+                // Available today: set availability and dateRange to today
+                const today = new Date();
+                const end = new Date();
+                end.setDate(end.getDate() + 1);
+                setFilters(prev => ({
+                  ...prev,
+                  availability: 'available',
+                  dateRange: { start: today, end },
+                }));
+                performSearch();
+              }}
+            >
               <Text style={styles.quickFilterText}>Available today</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickFilter}>
+
+            <TouchableOpacity
+              style={styles.quickFilter}
+              onPress={() => {
+                // Highly rated quick filter
+                setFilters(prev => ({
+                  ...prev,
+                  minRating: 4,
+                }));
+                performSearch();
+              }}
+            >
               <Text style={styles.quickFilterText}>Highly rated</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -869,7 +1273,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   sliderContainer: {
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  sliderLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
   },
   slider: {
     width: '100%',
@@ -1081,7 +1490,48 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
   },
-
+  clearDatesButton: {
+    marginTop: 8,
+    padding: 8,
+    alignItems: 'center',
+  },
+  clearDatesText: {
+    fontSize: 14,
+    color: '#EF4444',
+    fontWeight: '500',
+  },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  datePickerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 300,
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  datePickerButton: {
+    padding: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  datePickerButtonText: {
+    fontSize: 16,
+    color: '#111827',
+    textAlign: 'center',
+  },
 });
 
 export default SearchScreen;

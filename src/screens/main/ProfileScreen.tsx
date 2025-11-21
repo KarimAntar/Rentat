@@ -21,6 +21,7 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 import Button from '../../components/ui/Button';
 import { SubscriptionModal } from '../../components/ui/SubscriptionModal';
 import { commissionService } from '../../services/commission';
+import TabHeader from '../../components/TabHeader';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db, collections } from '../../config/firebase';
 import { UserSubscription } from '../../services/subscriptions';
@@ -252,32 +253,14 @@ const ProfileScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TabHeader 
+        showGreeting={true}
+        showMessages={true}
+        showNotifications={true}
+        showSignOut={true}
+        onSignOut={handleSignOut}
+      />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          {user?.photoURL ? (
-            <Image source={{ uri: user.photoURL }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={40} color="#6B7280" />
-            </View>
-          )}
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>Welcome, {displayName}!</Text>
-            {isVerified && (
-              <View style={styles.kycVerifiedBadge}>
-                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                <Text style={styles.kycVerifiedText}>Verified</Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.email}>{email}</Text>
-          {user && !user.emailVerified && (
-            <View style={styles.verificationBadge}>
-              <Ionicons name="alert-circle" size={16} color="#F59E0B" />
-              <Text style={styles.verificationText}>Email not verified</Text>
-            </View>
-          )}
-        </View>
 
         {/* Identity Verification Prompt - Only show if not verified */}
         {isVerified === false && (
@@ -304,131 +287,35 @@ const ProfileScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Wallet Balance Card */}
-        <View style={styles.walletCard}>
-          <View style={styles.walletHeader}>
+        {/* Wallet Navigation Card - Link to dedicated Wallet screen */}
+        <TouchableOpacity
+          style={styles.walletNavigationCard}
+          onPress={() => {
+            const parentNavigation = navigation.getParent();
+            if (parentNavigation) {
+              parentNavigation.navigate('Wallet');
+            }
+          }}
+        >
+          <View style={styles.walletNavHeader}>
             <Ionicons name="wallet" size={24} color="#4639eb" />
-            <Text style={styles.walletTitle}>Wallet Balance</Text>
+            <View style={styles.walletNavContent}>
+              <Text style={styles.walletNavTitle}>Wallet & Earnings</Text>
+              <Text style={styles.walletNavSubtitle}>
+                View balance, commission tiers, and transaction history
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </View>
-          {balanceLoading ? (
-            <ActivityIndicator size="large" color="#4639eb" style={styles.walletLoader} />
-          ) : (
-            <Text style={styles.walletAmount}>
+          {!balanceLoading && !balanceError && (
+            <Text style={styles.walletNavAmount}>
               EGP {balance.toFixed(2)}
             </Text>
           )}
-          {balanceError && (
-            <Text style={styles.errorText}>{balanceError}</Text>
-          )}
-          <View style={styles.walletActions}>
-            <Button
-              title={kycVerified ? "Withdraw" : "Verify to Withdraw"}
-              onPress={handleWithdraw}
-              style={styles.withdrawButton}
-              size="small"
-              disabled={balance <= 0 || kycLoading}
-            />
-          </View>
-          {!kycVerified && !kycLoading && (
-            <Text style={styles.kycWarning}>
-              Complete identity verification to unlock withdrawals
-            </Text>
-          )}
-        </View>
-
-        {/* Commission Tier Card */}
-        {loading ? (
-          <View style={styles.tierCard}>
-            <ActivityIndicator size="large" color="#4639eb" />
-          </View>
-        ) : tierInfo && (
-          <View style={styles.tierCard}>
-            <View style={styles.tierHeader}>
-              <Ionicons
-                name={getTierIcon(tierInfo.currentTier) as any}
-                size={32}
-                color={getTierColor(tierInfo.currentTier)}
-              />
-              <View style={styles.tierHeaderText}>
-                <Text style={styles.tierTitle}>Commission Tier</Text>
-                <Text style={[styles.tierName, { color: getTierColor(tierInfo.currentTier) }]}>
-                  {tierInfo.currentTier}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.tierStats}>
-              <View style={styles.tierStat}>
-                <Text style={styles.tierStatNumber}>{tierInfo.completedRentals}</Text>
-                <Text style={styles.tierStatLabel}>Completed Rentals</Text>
-              </View>
-              <View style={styles.tierDivider} />
-              <View style={styles.tierStat}>
-                <Text style={styles.tierStatNumber}>
-                  {tierInfo.nextTier ? `${tierInfo.nextTier.currentRate}%` : '5%'}
-                </Text>
-                <Text style={styles.tierStatLabel}>Commission Rate</Text>
-              </View>
-            </View>
-
-            {tierInfo.nextTier && (
-              <View style={styles.nextTierInfo}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>
-                    Progress to {tierInfo.nextTier.name}
-                  </Text>
-                  <Text style={styles.progressValue}>
-                    {tierInfo.nextTier.rentalsNeeded} more rentals
-                  </Text>
-                </View>
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${Math.min(
-                          (tierInfo.completedRentals / (tierInfo.completedRentals + tierInfo.nextTier.rentalsNeeded)) * 100,
-                          100
-                        )}%`
-                      }
-                    ]}
-                  />
-                </View>
-                <Text style={styles.nextTierBenefit}>
-                  Unlock {tierInfo.nextTier.nextRate}% commission rate
-                  (save {(tierInfo.nextTier.currentRate - tierInfo.nextTier.nextRate).toFixed(1)}% per rental!)
-                </Text>
-              </View>
-            )}
-
-            {!tierInfo.nextTier && (
-              <View style={styles.maxTierBadge}>
-                <Ionicons name="star" size={16} color="#FFD700" />
-                <Text style={styles.maxTierText}>
-                  You've reached the highest tier! 🎉
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        <View style={styles.stats}>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Items Listed</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Rentals</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
-          </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.menu}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuItem}
             onPress={handleEditProfile}
           >
@@ -456,12 +343,12 @@ const ProfileScreen: React.FC = () => {
             onPress={() => {
               const parentNavigation = navigation.getParent();
               if (parentNavigation) {
-                parentNavigation.navigate('RentalRequests');
+                parentNavigation.navigate('Wallet');
               }
             }}
           >
-            <Ionicons name="document-text-outline" size={24} color="#6B7280" />
-            <Text style={styles.menuText}>Rental Requests</Text>
+            <Ionicons name="wallet-outline" size={24} color="#6B7280" />
+            <Text style={styles.menuText}>Wallet</Text>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
 
@@ -476,20 +363,6 @@ const ProfileScreen: React.FC = () => {
           >
             <Ionicons name="list-outline" size={24} color="#6B7280" />
             <Text style={styles.menuText}>My Listings</Text>
-            <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              const parentNavigation = navigation.getParent();
-              if (parentNavigation) {
-                parentNavigation.navigate('RentalHistory');
-              }
-            }}
-          >
-            <Ionicons name="time-outline" size={24} color="#6B7280" />
-            <Text style={styles.menuText}>Rental History</Text>
             <Ionicons name="chevron-forward" size={20} color="#6B7280" />
           </TouchableOpacity>
 
@@ -522,6 +395,22 @@ const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Stats Section - Moved to bottom */}
+        <View style={styles.stats}>
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Items Listed</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Rentals</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Reviews</Text>
+          </View>
+        </View>
+
         <Button
           title="Sign Out"
           onPress={handleSignOut}
@@ -551,59 +440,6 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: 16,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  kycVerifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  kycVerifiedText: {
-    fontSize: 12,
-    color: '#10B981',
-    fontWeight: '500',
-  },
-  email: {
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  verificationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginTop: 8,
-  },
-  verificationText: {
-    fontSize: 12,
-    color: '#F59E0B',
-    fontWeight: '500',
-    marginLeft: 4,
   },
   stats: {
     flexDirection: 'row',
@@ -847,6 +683,44 @@ const styles = StyleSheet.create({
     color: '#F59E0B',
     textAlign: 'center',
     marginTop: 8,
+  },
+  // Wallet Navigation Card - Links to Wallet screen
+  walletNavigationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  walletNavHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  walletNavContent: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 12,
+  },
+  walletNavTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  walletNavSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  walletNavAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#10B981',
+    textAlign: 'right',
   },
 });
 

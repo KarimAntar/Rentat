@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ import { Rental } from '../../types';
 
 interface RentalWithDetails extends Rental {
   itemTitle?: string;
+  itemImage?: string;
   renterName?: string;
 }
 
@@ -180,6 +182,12 @@ const RentalRequestsScreen: React.FC = () => {
           requests.map((request) => (
             <View key={request.id} style={styles.requestCard}>
               <View style={styles.requestHeader}>
+                {request.itemImage && (
+                  <Image
+                    source={{ uri: request.itemImage }}
+                    style={styles.itemImage}
+                  />
+                )}
                 <View style={styles.requestInfo}>
                   <Text style={styles.itemTitle}>{request.itemTitle || 'Item'}</Text>
                   <Text style={styles.renterName}>
@@ -202,6 +210,12 @@ const RentalRequestsScreen: React.FC = () => {
                   <Ionicons name="cash-outline" size={16} color="#6B7280" />
                   <Text style={styles.detailText}>
                     {formatPrice(request.pricing.total)}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="wallet-outline" size={16} color="#10B981" />
+                  <Text style={[styles.detailText, styles.earningsText]}>
+                    You'll earn: {formatPrice((request.pricing.subtotal || 0) - (request.pricing.platformFee || 0))}
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
@@ -329,6 +343,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+    gap: 12,
+  },
+  itemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
   },
   requestInfo: {
     flex: 1,
@@ -365,6 +386,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#374151',
     marginLeft: 8,
+  },
+  earningsText: {
+    color: '#10B981',
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',

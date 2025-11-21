@@ -1,0 +1,30 @@
+﻿{/* Timeline */}
+        {order.timeline && order.timeline.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Order Timeline</Text>
+
+            {order.timeline
+              .sort((a, b) => {
+                const aTime = getTimestampMs(a.timestamp);
+                const bTime = getTimestampMs(b.timestamp);
+                return bTime - aTime;
+              })
+              .map((event, index) => (
+                <View key={index} style={styles.timelineItem}>
+                  <View style={styles.timelineDot} />
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.timelineEvent}>{event.event.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Text>
+                    <Text style={styles.timelineTime}>
+                      {formatDate(event.timestamp)} at {formatTime(event.timestamp)}
+                    </Text>
+                    {event.details && (
+                      <Text style={styles.timelineDetails}>
+                        {typeof event.details === 'string' ? event.details :
+                         event.details.message || JSON.stringify(event.details)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+          </View>
+        )}

@@ -117,6 +117,7 @@ export const collections = {
   notifications: 'notifications',
   categories: 'categories',
   adminLogs: 'admin_logs',
+  favorites: 'favorites',
 } as const;
 
 // Export Firebase services

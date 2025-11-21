@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,10 +22,12 @@ type RootStackParamList = {
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 import { useAuthContext } from '../../contexts/AuthContext';
+import { db, collections } from '../../config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useFeaturedItems, useItems } from '../../hooks/useFirestore';
 import { Item } from '../../types';
 import { getGovernorateById } from '../../data/governorates';
-import UserGreeting from '../../components/UserGreeting';
+import TabHeader from '../../components/TabHeader';
 
 const { width } = Dimensions.get('window');
 
@@ -95,22 +97,14 @@ const HomeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TabHeader 
+        showGreeting={true}
+        showMessages={true}
+        showNotifications={true}
+        showSignOut={true}
+        onSignOut={handleSignOut}
+      />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-
-        {/* Greeting Header - Simple Header Style */}
-        <View style={styles.greetingHeader}>
-          <View style={styles.greetingSection}>
-            <UserGreeting avatarSize={56} />
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.actionButton}>
-              <Ionicons name="notifications-outline" size={24} color="#6B7280" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleSignOut()} style={styles.actionButton}>
-              <Ionicons name="log-out-outline" size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-        </View>
 
         {/* Logo and Welcome Section - Purple Background */}
         <View style={styles.logoWelcomeHeader}>
@@ -157,18 +151,18 @@ const HomeScreen: React.FC = () => {
 
             <TouchableOpacity
               style={[styles.actionCard, { backgroundColor: '#FFFBEB' }]}
-              onPress={() => navigation.navigate('Search' as never)}
+              onPress={() => navigation.navigate('HelpSupport' as never)}
             >
               <View style={[styles.actionIcon, { backgroundColor: '#FFFFFF' }]}>
-                <Ionicons name="location" size={28} color="#F59E0B" />
+                <Ionicons name="help-circle" size={28} color="#F59E0B" />
               </View>
-              <Text style={styles.actionTitle}>Near Me</Text>
-              <Text style={styles.actionSubtitle}>Local rentals</Text>
+              <Text style={styles.actionTitle}>Help & Support</Text>
+              <Text style={styles.actionSubtitle}>Get assistance</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.actionCard, { backgroundColor: '#FEF2F2' }]}
-              onPress={() => navigation.navigate('Search' as never)}
+              onPress={() => navigation.navigate('Favorites' as never)}
             >
               <View style={[styles.actionIcon, { backgroundColor: '#FFFFFF' }]}>
                 <Ionicons name="heart" size={28} color="#EF4444" />
@@ -277,81 +271,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Greeting Header - Simple Header Style
-  greetingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 20,
-  },
-  greetingWithAvatar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarContainer: {
-    position: 'relative',
-  },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  verifiedAvatar: {
-    borderWidth: 2,
-    borderColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  verificationBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#10B981',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  greetingTextContainer: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  kycVerifiedBadge: {
-    marginLeft: 4,
-  },
-  greetingEmoji: {
-    marginLeft: 4,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 
   // Logo and Welcome Header - Purple Background
   logoWelcomeHeader: {
