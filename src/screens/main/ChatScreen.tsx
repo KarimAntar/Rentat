@@ -158,7 +158,24 @@ const ChatScreen: React.FC = () => {
         // Temporarily skip participant check - rules should allow access
         setChat(existingChat);
         // Subscribe to messages only for real chat documents
-        const unsubscribe = ChatService.subscribeToMessages(existingChat.id, (msgs) => {
+        const unsubscribe = ChatService.subscribeToMessages(existingChat.id, async (msgs) => {
+          // Mark unread messages from others as read when they arrive
+          const unreadMessageIds: string[] = [];
+          msgs.forEach(m => {
+            if (m.senderId !== user.uid && !m.status?.readBy?.includes(user.uid)) {
+              unreadMessageIds.push(m.id);
+            }
+          });
+
+          // Mark messages as read if there are any unread ones
+          if (unreadMessageIds.length > 0) {
+            try {
+              await ChatService.markAsRead(existingChat.id, user.uid);
+            } catch (error) {
+              console.error('Error marking messages as read:', error);
+            }
+          }
+
           setMessages(
             msgs.map(m => ({
               ...m,
