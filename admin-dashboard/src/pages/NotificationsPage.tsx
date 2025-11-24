@@ -41,7 +41,6 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
-  where,
 } from 'firebase/firestore';
 
 interface Notification {

@@ -16,6 +16,9 @@ import { FeatureFlagsPage } from './pages/FeatureFlagsPage';
 import { DisputesPage } from './pages/DisputesPage';
 import { ModerationPage } from './pages/ModerationPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PayoutsPage } from './pages/PayoutsPage';
+import { WalletAnalyticsPage } from './pages/WalletAnalyticsPage';
+import { HandoverMonitoringPage } from './pages/HandoverMonitoringPage';
 
 // Protected Route wrapper
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -173,6 +176,42 @@ function AppContent() {
           <ProtectedRoute>
             <DashboardLayout>
               <DisputesPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Payouts */}
+      <Route
+        path="/payouts"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <PayoutsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Wallet Analytics */}
+      <Route
+        path="/wallet-analytics"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <WalletAnalyticsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Handover Monitoring */}
+      <Route
+        path="/handover-monitoring"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <HandoverMonitoringPage />
             </DashboardLayout>
           </ProtectedRoute>
         }

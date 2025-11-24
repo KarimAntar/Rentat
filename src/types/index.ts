@@ -238,14 +238,16 @@ export interface Rental {
   payment: RentalPayment;
   delivery: RentalDelivery;
   communication: RentalCommunication;
+  handover?: RentalHandover;
   completion: RentalCompletion;
+  dispute?: RentalDispute;
   cancellation?: RentalCancellation;
   createdAt: Date;
   updatedAt: Date;
   timeline: RentalTimelineEvent[];
 }
 
-export type RentalStatus = 'pending' | 'approved' | 'rejected' | 'declined' | 'active' | 'completed' | 'cancelled' | 'disputed';
+export type RentalStatus = 'pending' | 'approved' | 'rejected' | 'declined' | 'awaiting_handover' | 'active' | 'completed' | 'cancelled' | 'disputed';
 
 export interface RentalDates {
   requestedStart: Date;
@@ -313,6 +315,14 @@ export interface RentalCommunication {
   lastMessage?: Date;
 }
 
+// Handover tracking for dual confirmation
+export interface RentalHandover {
+  renterConfirmed: boolean;
+  renterConfirmedAt?: Date;
+  ownerConfirmed: boolean;
+  ownerConfirmedAt?: Date;
+}
+
 export interface RentalCompletion {
   ownerConfirmed?: boolean;
   renterConfirmed?: boolean;
@@ -350,6 +360,23 @@ export interface DamageReport {
   amount?: number;
   hasDamage: boolean;
   deductionAmount?: number; // Amount to deduct from deposit
+}
+
+// Dispute tracking
+export interface RentalDispute {
+  status: 'open' | 'under_review' | 'resolved';
+  initiatedBy: 'owner' | 'renter';
+  reason: string;
+  evidence: string[];
+  initiatedAt: Date;
+  moderatorId?: string;
+  resolution?: {
+    decision: string;
+    refundAmount: number;
+    ownerCompensation: number;
+    resolvedAt: Date;
+    resolvedBy: string;
+  };
 }
 
 export interface RentalCancellation {
@@ -488,19 +515,23 @@ export interface WalletTransaction {
   amount: number;
   currency: string;
   status: TransactionStatus;
+  availabilityStatus?: TransactionAvailabilityStatus;
   relatedRentalId?: string;
   relatedItemId?: string;
+  relatedUserId?: string;
   payment: TransactionPayment;
   metadata: TransactionMetadata;
   createdAt: Date;
   processedAt?: Date;
 }
 
-export type TransactionType = 'rental_payment' | 'rental_payout' | 'deposit_hold' | 'deposit_release' | 'refund' | 'fee' | 'withdrawal';
+export type TransactionType = 'rental_payment' | 'rental_income' | 'rental_payout' | 'deposit_hold' | 'deposit_release' | 'deposit_refund' | 'refund' | 'fee' | 'withdrawal' | 'withdrawal_request';
 export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'cancelled';
+export type TransactionAvailabilityStatus = 'PENDING' | 'LOCKED' | 'AVAILABLE';
 
 export interface TransactionPayment {
   stripeTransactionId?: string;
+  paymobTransactionId?: string;
   paymentMethod?: string;
   description: string;
 }
@@ -509,6 +540,21 @@ export interface TransactionMetadata {
   platformFee?: number;
   processingFee?: number;
   netAmount: number;
+}
+
+// Paymob transaction audit record
+export interface PaymobTransaction {
+  id: string;
+  rentalId: string;
+  paymobOrderId: number;
+  paymobTransactionId: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'success' | 'failed';
+  hmac?: string;
+  rawPayload: any;
+  createdAt: Date;
+  processedAt?: Date;
 }
 
 // Notification Types
@@ -717,6 +763,7 @@ export type RootStackParamList = {
   Orders: undefined;
   OrderDetails: { rentalId: string };
   RentalPayment: { rentalId: string };
+  CreateDispute: { rentalId: string; rental: Rental };
 };
 
 export type AuthStackParamList = {

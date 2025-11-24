@@ -17,6 +17,10 @@ import { RentalService } from '../../services/firestore';
 import { Rental, RootStackParamList } from '../../types';
 import { commissionService } from '../../services/commission';
 import { UserService } from '../../services/firestore';
+import { HandoverStatus } from '../../components/rental/HandoverStatus';
+import { ConfirmHandoverButton } from '../../components/rental/ConfirmHandoverButton';
+import { DisputeStatusCard } from '../../components/rental/DisputeStatusCard';
+import { ReportIssueButton } from '../../components/rental/ReportIssueButton';
 
 type OrderDetailsScreenRouteProp = RouteProp<RootStackParamList, 'OrderDetails'>;
 
@@ -267,6 +271,36 @@ const OrderDetailsScreen: React.FC = () => {
           )}
         </View>
 
+        {/* Handover Status - Show when awaiting_handover */}
+        {order.status === 'awaiting_handover' && user && (
+          <>
+            <HandoverStatus
+              rental={order}
+              isOwner={isOwner}
+              currentUserId={user.uid}
+            />
+            
+            <ConfirmHandoverButton
+              rental={order}
+              currentUserId={user.uid}
+              isOwner={isOwner}
+              onConfirm={() => {
+                // Refresh rental data
+                loadOrderDetails();
+              }}
+            />
+          </>
+        )}
+
+        {/* Dispute Status - Show if dispute exists */}
+        {order.dispute && user && (
+          <DisputeStatusCard
+            rental={order}
+            userRole={isOwner ? 'owner' : 'renter'}
+            currentUserId={user.uid}
+          />
+        )}
+
         {/* Item Details */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Item & Dates</Text>
@@ -497,6 +531,20 @@ const OrderDetailsScreen: React.FC = () => {
             >
               <Text style={styles.primaryButtonText}>Complete Payment</Text>
             </TouchableOpacity>
+          )}
+
+          {/* Report Issue Button for active/completed rentals */}
+          {user && (order.status === 'active' || order.status === 'completed') && (
+            <ReportIssueButton
+              rental={order}
+              currentUserId={user.uid}
+              onPress={() => {
+                navigation.navigate('CreateDispute', {
+                  rentalId: order.id,
+                  rental: order,
+                });
+              }}
+            />
           )}
 
           <TouchableOpacity

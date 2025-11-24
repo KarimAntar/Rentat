@@ -33,6 +33,9 @@ import {
   AccountCircle,
   Security,
   Gavel,
+  MonetizationOn,
+  AccountBalance,
+  HourglassEmpty,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -53,6 +56,9 @@ const navItems: NavItem[] = [
   { title: 'Items', path: '/items', icon: <Inventory />, requiredPermission: 'content' },
   { title: 'Rentals', path: '/rentals', icon: <Receipt />, requiredPermission: 'content' },
   { title: 'Disputes', path: '/disputes', icon: <Gavel />, requiredPermission: 'content' },
+  { title: 'Payouts', path: '/payouts', icon: <MonetizationOn />, requiredPermission: 'analytics' },
+  { title: 'Wallet Analytics', path: '/wallet-analytics', icon: <AccountBalance />, requiredPermission: 'analytics' },
+  { title: 'Handover Monitoring', path: '/handover-monitoring', icon: <HourglassEmpty />, requiredPermission: 'content' },
   { title: 'Moderation', path: '/moderation', icon: <Security />, requiredPermission: 'content' },
   { title: 'Analytics', path: '/analytics', icon: <BarChart />, requiredPermission: 'analytics' },
   { title: 'Notifications', path: '/notifications', icon: <Notifications />, requiredPermission: 'notifications' },

@@ -7,6 +7,14 @@ import cors from 'cors';
 import { initializeFirebaseAdmin, getFirestore, config } from './config';
 import { diditKycService } from './services/diditKyc';
 import PaymobFunctionsService from './services/paymob';
+import {
+  confirmHandoverByRenter,
+  confirmHandoverByOwner,
+  raiseDispute,
+  resolveDispute,
+  getWalletBalance,
+} from './services/rentalFlow';
+
 
 const paymob = PaymobFunctionsService.initialize({
   apiKey: config.paymob.apiKey,
@@ -110,8 +118,9 @@ app.post('/paymob-webhook', express.json(), async (req, res) => {
 
       await rentalRef.update({
         'payment.paymentStatus': 'succeeded',
-        status: 'active',
-        'dates.actualStart': admin.firestore.FieldValue.serverTimestamp(),
+        status: 'awaiting_handover', // ← Changed from 'active'
+        'handover.renterConfirmed': false,
+        'handover.ownerConfirmed': false,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         timeline: admin.firestore.FieldValue.arrayUnion({
           event: 'payment_completed',
@@ -147,20 +156,21 @@ app.post('/paymob-webhook', express.json(), async (req, res) => {
           processedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // Owner transaction (credit to wallet)
+        // Owner transaction (credit to wallet but PENDING until rental completes)
         const ownerTxRef = db.collection('wallet_transactions').doc();
-        const ownerAmount = (rental.pricing.subtotal || 0) - (rental.pricing.platformFee || 0) + (rental.completion?.damageReported?.amount || 0);
+        const ownerAmount = (rental.pricing.subtotal || 0) - (rental.pricing.platformFee || 0);
         batch.set(ownerTxRef, {
           userId: rental.ownerId,
           type: 'rental_income',
           amount: ownerAmount,
           currency: rental.pricing.currency,
           status: 'completed',
+          availabilityStatus: 'PENDING', // ← Added: Funds held in escrow
           relatedRentalId: rentalRef.id,
           relatedItemId: rental.itemId,
           payment: {
             paymobTransactionId: transactionId,
-            description: 'Owner payout (credited to wallet)',
+            description: 'Rental income (held in escrow until completion)',
           },
           metadata: {
             platformFee: rental.pricing.platformFee,
@@ -274,18 +284,18 @@ app.post('/paymob-webhook', express.json(), async (req, res) => {
         console.error('Error creating wallet transactions after Paymob success:', err);
       }
 
-      // Send notifications
+      // Send notifications about handover confirmation
       await sendNotification(rental.renterId, {
         type: 'payment',
         title: 'Payment Successful',
-        body: 'Your rental payment has been processed successfully',
+        body: 'Please confirm item handover to activate the rental',
         data: { rentalId: rentalRef.id, orderId },
       });
 
       await sendNotification(rental.ownerId, {
         type: 'rental_confirmed',
-        title: 'Rental Confirmed',
-        body: 'Your item has been successfully rented',
+        title: 'Rental Payment Received',
+        body: 'Please confirm item handover to activate the rental',
         data: { rentalId: rentalRef.id, orderId },
       });
     } else if (!success && !pending) {
@@ -1564,8 +1574,23 @@ async function processRentalCompletion(data: { rentalId: string }) {
       }),
     });
 
+    // Find and update the original rental_income transaction from PENDING to AVAILABLE
+    const incomeTransactionsSnap = await db.collection('wallet_transactions')
+      .where('relatedRentalId', '==', rentalId)
+      .where('type', '==', 'rental_income')
+      .where('userId', '==', rental.ownerId)
+      .get();
+
     // Create wallet transactions
     const batch = db.batch();
+
+    // Update the original PENDING transaction to AVAILABLE
+    incomeTransactionsSnap.forEach((doc) => {
+      batch.update(doc.ref, {
+        availabilityStatus: 'AVAILABLE',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
 
     // Deposit refund transaction for renter (if any)
     if (depositRefund > 0) {
@@ -1576,6 +1601,7 @@ async function processRentalCompletion(data: { rentalId: string }) {
         amount: depositRefund,
         currency: rental.pricing.currency,
         status: 'completed',
+        availabilityStatus: 'AVAILABLE',
         relatedRentalId: rentalId,
         relatedItemId: rental.itemId,
         payment: {
@@ -1591,47 +1617,11 @@ async function processRentalCompletion(data: { rentalId: string }) {
       });
     }
 
-    // Owner payout transaction (credited to wallet)
-    const ownerTxRef = db.collection('wallet_transactions').doc();
-    batch.set(ownerTxRef, {
-      userId: rental.ownerId,
-      type: 'rental_payout',
-      amount: ownerPayout,
-      currency: rental.pricing.currency,
-      status: 'completed',
-      relatedRentalId: rentalId,
-      relatedItemId: rental.itemId,
-      payment: {
-        description: 'Rental completed - amount credited to wallet',
-      },
-      metadata: {
-        subtotal: rental.pricing.subtotal,
-        platformFee: rental.pricing.platformFee,
-        damageCompensation: damageDeduction,
-        netAmount: ownerPayout,
-      },
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      processedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
     await batch.commit();
 
-    // Update wallet balances
-    const walletUpdates = [];
-
-    // Update owner wallet
-    walletUpdates.push(
-      db.collection('users').doc(rental.ownerId).update({
-        'wallet.balance': admin.firestore.FieldValue.increment(ownerPayout),
-        'wallet.totalEarnings': admin.firestore.FieldValue.increment(ownerPayout),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      })
-    );
-
-    // Note: Deposit refund would typically go back to the original payment method
-    // For now, we're tracking it in transactions but not adding to wallet balance
-
-    await Promise.all(walletUpdates);
+    // Note: Wallet balances were already updated when payment was received
+    // The availabilityStatus change from PENDING to AVAILABLE doesn't change the balance
+    // Deposit refunds would typically go back to the original payment method
 
     // Send completion notifications
     await Promise.all([
@@ -2004,3 +1994,147 @@ async function completeRentalTransaction(rentalId: string, rental: any) {
     console.error('Error completing rental transaction:', error);
   }
 }
+
+// ==================== NEW RENTAL FLOW FUNCTIONS ====================
+
+// Phase 3: Handover confirmation endpoints
+export const confirmHandoverRenter = onCall(async (request) => {
+  const { auth, data } = request;
+  
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rentalId } = data;
+
+  try {
+    const result = await confirmHandoverByRenter(rentalId, auth.uid);
+    
+    // Send notification to owner
+    const rentalDoc = await db.collection('rentals').doc(rentalId).get();
+    const rental = rentalDoc.data()!;
+    
+    await sendNotification(rental.ownerId, {
+      type: 'rental_update',
+      title: 'Handover Confirmed',
+      body: result.bothConfirmed
+        ? 'Both parties confirmed - rental is now active!'
+        : 'Renter confirmed receiving the item',
+      data: { rentalId, itemId: rental.itemId },
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error confirming handover by renter:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to confirm handover');
+  }
+});
+
+export const confirmHandoverOwner = onCall(async (request) => {
+  const { auth, data } = request;
+  
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rentalId } = data;
+
+  try {
+    const result = await confirmHandoverByOwner(rentalId, auth.uid);
+    
+    // Send notification to renter
+    const rentalDoc = await db.collection('rentals').doc(rentalId).get();
+    const rental = rentalDoc.data()!;
+    
+    await sendNotification(rental.renterId, {
+      type: 'rental_update',
+      title: 'Handover Confirmed',
+      body: result.bothConfirmed
+        ? 'Both parties confirmed - rental is now active!'
+        : 'Owner confirmed handing over the item',
+      data: { rentalId, itemId: rental.itemId },
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error confirming handover by owner:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to confirm handover');
+  }
+});
+
+// Phase 4: Dispute management endpoints
+export const createDispute = onCall(async (request) => {
+  const { auth, data } = request;
+  
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rentalId, reason, evidence } = data;
+
+  try {
+    return await raiseDispute(rentalId, auth.uid, reason, evidence || []);
+  } catch (error) {
+    console.error('Error raising dispute:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to raise dispute');
+  }
+});
+
+export const resolveDisputeFunction = onCall(async (request) => {
+  const { auth, data } = request;
+  
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rentalId, decision, refundAmount, ownerCompensation } = data;
+
+  try {
+    // Verify user has moderator role
+    const userDoc = await db.collection('users').doc(auth.uid).get();
+    const user = userDoc.data();
+    
+    if (!user?.isModerator && !user?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Only moderators can resolve disputes');
+    }
+
+    return await resolveDispute(
+      rentalId,
+      auth.uid,
+      decision,
+      refundAmount || 0,
+      ownerCompensation || 0
+    );
+  } catch (error) {
+    console.error('Error resolving dispute:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to resolve dispute');
+  }
+});
+
+// Phase 5: Wallet balance endpoint
+export const getWalletBalanceFunction = onCall(async (request) => {
+  const { auth, data } = request;
+  
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = data?.userId || auth.uid;
+
+  // Users can only view their own wallet unless they're admin
+  if (userId !== auth.uid) {
+    const userDoc = await db.collection('users').doc(auth.uid).get();
+    const user = userDoc.data();
+    
+    if (!user?.isAdmin) {
+      throw new HttpsError('permission-denied', 'Cannot view other users wallets');
+    }
+  }
+
+  try {
+    return await getWalletBalance(userId);
+  } catch (error) {
+    console.error('Error getting wallet balance:', error);
+    throw new HttpsError('internal', 'Failed to get wallet balance');
+  }
+});

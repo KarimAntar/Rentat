@@ -83,15 +83,26 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         // Owner can approve/reject requests and update status
         (isOwner(resource.data.ownerId) &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'dates.confirmedStart', 'dates.confirmedEnd', 'completion.ownerConfirmed', 'updatedAt', 'timeline'])) ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'dates.confirmedStart', 'dates.confirmedEnd', 'completion.ownerConfirmed', 'updatedAt', 'timeline', 'handover'])) ||
 
-        // Renter can confirm completion
+        // Renter can confirm completion and handover
         (isOwner(resource.data.renterId) &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completion.renterConfirmed', 'updatedAt', 'timeline'])) ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completion.renterConfirmed', 'updatedAt', 'timeline', 'handover'])) ||
 
         // Both can update actual start/end times and damage reports
         ((isOwner(resource.data.ownerId) || isOwner(resource.data.renterId)) &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dates.actualStart', 'dates.actualEnd', 'completion.damageReported', 'updatedAt', 'timeline'])) ||
+
+        // Both owner and renter can raise disputes
+        ((isOwner(resource.data.ownerId) || isOwner(resource.data.renterId)) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dispute', 'status', 'updatedAt', 'timeline']) &&
+         resource.data.status in ['active', 'completed']) ||
+
+        // Moderators can resolve disputes
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isModerator == true ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true) &&
+         request.resource.data.dispute.status == 'resolved') ||
 
         // System/Admin updates (payment processing, escrow, Paymob webhooks, etc.)
         isAdmin()
@@ -181,6 +192,32 @@ service cloud.firestore {
       allow create: if isAdmin(); // Only system can create transactions
       
       allow update: if isAdmin(); // Only system can update transactions
+      
+      allow delete: if isAdmin();
+    }
+    
+    // Paymob transactions collection (audit trail)
+    match /paymob_transactions/{transactionId} {
+      allow read: if isAuthenticated() &&
+        // Users can read Paymob transactions for their rentals
+        (exists(/databases/$(database)/documents/rentals/$(resource.data.rentalId)) &&
+         (get(/databases/$(database)/documents/rentals/$(resource.data.rentalId)).data.ownerId == request.auth.uid ||
+          get(/databases/$(database)/documents/rentals/$(resource.data.rentalId)).data.renterId == request.auth.uid) ||
+         isAdmin());
+      
+      allow create: if false; // Only system (backend) can create
+      allow update: if false; // Only system can update
+      allow delete: if false; // Immutable audit trail
+    }
+    
+    // Payout requests collection
+    match /payout_requests/{requestId} {
+      allow read: if isAuthenticated() &&
+        (isOwner(resource.data.userId) || isAdmin());
+      
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
+      
+      allow update: if isAdmin(); // Only admins can process payouts
       
       allow delete: if isAdmin();
     }

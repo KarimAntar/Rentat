@@ -58,3 +58,25 @@ export declare const requestPayout: import("firebase-functions/v2/https").Callab
 export declare const markAllNotificationsRead: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     updated: number;
 }>, unknown>;
+export declare const confirmHandoverRenter: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    bothConfirmed: boolean;
+}>, unknown>;
+export declare const confirmHandoverOwner: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    bothConfirmed: boolean;
+}>, unknown>;
+export declare const createDispute: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    disputeId: string;
+}>, unknown>;
+export declare const resolveDisputeFunction: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+}>, unknown>;
+export declare const getWalletBalanceFunction: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    available: number;
+    pending: number;
+    locked: number;
+    total: number;
+    currency: string;
+}>, unknown>;

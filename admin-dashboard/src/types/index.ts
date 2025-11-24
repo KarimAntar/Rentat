@@ -328,6 +328,59 @@ export interface PaginatedResponse<T> {
   };
 }
 
+// Payout Request Types
+export interface PayoutRequest {
+  id: string;
+  userId: string;
+  amount: number;
+  currency: string;
+  status: PayoutRequestStatus;
+  method: PayoutMethod;
+  accountDetails: PayoutAccountDetails;
+  requestedAt: Date;
+  processedAt?: Date;
+  processedBy?: string;
+  rejectionReason?: string;
+  notes?: string;
+}
+
+export type PayoutRequestStatus = 'pending' | 'approved' | 'processing' | 'completed' | 'rejected';
+export type PayoutMethod = 'bank_transfer' | 'mobile_wallet' | 'paypal';
+
+export interface PayoutAccountDetails {
+  type: PayoutMethod;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
+  walletNumber?: string;
+  walletProvider?: string;
+  email?: string;
+}
+
+// Wallet Balance Types
+export interface WalletBalance {
+  userId: string;
+  available: number;
+  pending: number;
+  locked: number;
+  total: number;
+}
+
+// Handover Monitoring Types
+export interface HandoverMonitoring {
+  rentalId: string;
+  itemId: string;
+  ownerId: string;
+  renterId: string;
+  status: 'awaiting_handover';
+  paymentReceivedAt: Date;
+  hoursSincePayment: number;
+  renterConfirmed: boolean;
+  ownerConfirmed: boolean;
+  remindersSent: number;
+  lastReminderAt?: Date;
+}
+
 // Import types from main app (these will be shared)
 export type {
   Item,
@@ -341,6 +394,9 @@ export type {
   ItemStatus,
   PaymentStatus,
   ItemCondition,
+  TransactionAvailabilityStatus,
+  RentalHandover,
+  RentalDispute,
 } from '../../../src/types/index';
 
 // Import base User type and extend it with admin-specific fields

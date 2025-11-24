@@ -98,11 +98,10 @@ const CustomTabBar: React.FC<any> = ({ state, descriptors, navigation }) => {
         { name: 'SignIn', label: 'Sign in', icon: 'log-in' }
       ];
     } else {
-      // Authenticated user tabs: Home | Search | Messages | Add Item | Orders | Account
+      // Authenticated user tabs: Home | Search | Add Item | Orders | Account
       return [
         { name: 'Home', label: 'Home', icon: 'home' },
         { name: 'Search', label: 'Search', icon: 'search' },
-        { name: 'Messages', label: 'Messages', icon: 'chatbubble' },
         { name: 'AddItem', label: 'Add Item', icon: 'add-circle' },
         { name: 'Orders', label: 'Orders', icon: 'receipt' },
         { name: 'Account', label: 'Account', icon: 'person' }
@@ -350,14 +349,6 @@ const MainNavigator: React.FC = () => {
       />
 
       <MainTab.Screen
-        name="Messages"
-        component={require('../screens/main/MessagesScreen').default}
-        options={{
-          title: 'Messages',
-        }}
-      />
-
-      <MainTab.Screen
         name="Account"
         component={ProfileScreen}
         options={{
@@ -503,6 +494,42 @@ const AppNavigator: React.FC = () => {
           options={{ headerShown: false }}
         />
         <RootStack.Screen
+          name="Messages"
+          component={require('../screens/main/MessagesScreen').default}
+          options={({ navigation }) => ({
+            headerShown: true,
+            headerTitle: 'Messages',
+            headerTitleStyle: {
+              fontSize: 18,
+              fontWeight: '600',
+              color: '#111827',
+            },
+            headerLeft: () => (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => {
+                  if (navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else {
+                    // If no previous page, navigate to Home
+                    navigation.navigate('Main', { screen: 'Home' });
+                  }
+                }}
+              >
+                <Ionicons name="arrow-back" size={24} color="#111827" />
+              </TouchableOpacity>
+            ),
+            headerStyle: {
+              backgroundColor: '#FFFFFF',
+              elevation: 4,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+            },
+          })}
+        />
+        <RootStack.Screen
           name="Wallet"
           component={require('../screens/main/WalletScreen').default}
           options={{ headerShown: false }}
@@ -511,6 +538,27 @@ const AppNavigator: React.FC = () => {
           name="RentalPayment"
           component={require('../screens/main/RentalPaymentScreen').default}
           options={{ headerShown: false }}
+        />
+        <RootStack.Screen
+          name="CreateDispute"
+          component={require('../screens/main/CreateDisputeScreen').default}
+          options={{
+            headerShown: true,
+            title: 'Report Issue',
+            headerStyle: {
+              backgroundColor: '#FFFFFF',
+              elevation: 4,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+            },
+            headerTintColor: '#111827',
+            headerTitleStyle: {
+              fontWeight: '600',
+              fontSize: 18,
+            },
+          }}
         />
       </RootStack.Navigator>
 
@@ -679,6 +727,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     paddingHorizontal: 4,
+  },
+  backButton: {
+    padding: 8,
   },
 });
 

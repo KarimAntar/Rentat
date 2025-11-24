@@ -17,6 +17,7 @@ import { commissionService } from '../../services/commission';
 import { diditKycService } from '../../services/diditKyc';
 import { db, collections } from '../../config/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { WalletBalanceCard } from '../../components/wallet/WalletBalanceCard';
 
 interface CommissionTransaction {
   id: string;
@@ -235,37 +236,17 @@ const WalletScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Wallet Balance Card */}
-        <View style={styles.walletCard}>
-          <View style={styles.walletHeader}>
-            <Ionicons name="wallet" size={24} color="#FFFFFF" />
-            <Text style={styles.walletTitle}>Wallet Balance</Text>
-          </View>
-          {balanceLoading ? (
-            <ActivityIndicator size="large" color="#FFFFFF" style={styles.walletLoader} />
-          ) : (
-            <Text style={styles.walletAmount}>
-              EGP {balance.toFixed(2)}
-            </Text>
-          )}
-          {balanceError && (
-            <Text style={styles.errorText}>{balanceError}</Text>
-          )}
-          <View style={styles.walletActions}>
-            <Button
-              title={kycVerified ? "Withdraw" : "Verify to Withdraw"}
-              onPress={handleWithdraw}
-              style={styles.withdrawButton}
-              size="small"
-              disabled={balance <= 0 || kycLoading}
-            />
-          </View>
-          {!kycVerified && !kycLoading && (
-            <Text style={styles.kycWarning}>
-              Complete identity verification to unlock withdrawals
-            </Text>
-          )}
-        </View>
+        {/* Enhanced Wallet Balance Card with breakdown */}
+        {user && (
+          <WalletBalanceCard
+            userId={user.uid}
+            onRefresh={() => {
+              // Optional: Trigger any additional refresh logic
+              loadCommissionHistory();
+              loadTierInfo();
+            }}
+          />
+        )}
 
         {/* Commission Tier Card */}
         {tierLoading ? (
