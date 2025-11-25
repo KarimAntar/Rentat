@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -45,7 +46,7 @@ const MyListingsScreen: React.FC = () => {
       setListings(filteredListings);
     } catch (error) {
       console.error('Error loading listings:', error);
-      Alert.alert('Error', 'Failed to load your listings');
+      showAlert('Error', 'Failed to load your listings');
     } finally {
       setLoading(false);
     }
@@ -60,10 +61,10 @@ const MyListingsScreen: React.FC = () => {
       const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
       await ItemService.updateItem(itemId, { status: newStatus });
       loadListings(); // Refresh the list
-      Alert.alert('Success', `Item ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
+      showAlert('Success', `Item ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
     } catch (error) {
       console.error('Error updating item status:', error);
-      Alert.alert('Error', 'Failed to update item status');
+      showAlert('Error', 'Failed to update item status');
     }
   };
 
@@ -373,3 +374,5 @@ const styles = StyleSheet.create({
 });
 
 export default MyListingsScreen;
+
+

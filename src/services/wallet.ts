@@ -32,6 +32,48 @@ export interface WalletTransaction {
 }
 
 /**
+ * Get wallet balance filtered to only show credits/income (no negative expenses)
+ */
+export const getCreditsOnlyWalletBalance = async (
+  userId?: string
+): Promise<WalletBalance> => {
+  try {
+    // Get detailed balance from Cloud Function
+    const getBalance = httpsCallable<
+      { userId?: string },
+      WalletBalance
+    >(functions, 'getWalletBalanceFunction');
+
+    const result = await getBalance(userId ? { userId } : {});
+    const balance = result.data;
+
+    // Filter to only show credits (positive amounts) - hide expenses
+    return {
+      available: Math.max(0, balance.available),
+      pending: Math.max(0, balance.pending),
+      locked: Math.max(0, balance.locked),
+      total: Math.max(0, balance.available + balance.pending + balance.locked),
+      totalEarnings: Math.max(0, balance.totalEarnings),
+      totalWithdrawn: Math.max(0, balance.totalWithdrawn),
+      currency: balance.currency,
+    };
+  } catch (error) {
+    console.error('Error getting credits-only wallet balance:', error);
+
+    // Fallback to basic structure if Cloud Function fails
+    return {
+      available: 0,
+      pending: 0,
+      locked: 0,
+      total: 0,
+      totalEarnings: 0,
+      totalWithdrawn: 0,
+      currency: 'EGP',
+    };
+  }
+};
+
+/**
  * Get detailed wallet balance with breakdown
  */
 export const getDetailedWalletBalance = async (
@@ -142,9 +184,13 @@ export const getTransactionsByAvailability = async (
  * Format currency amount for display
  */
 export const formatCurrency = (
-  amount: number,
+  amount: number | undefined | null,
   currency: string = 'EGP'
 ): string => {
+  // Handle undefined/null amounts
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return `${currency} 0.00`;
+  }
   return `${currency} ${amount.toFixed(2)}`;
 };
 
@@ -265,7 +311,7 @@ export const requestPayout = async (
 };
 
 /**
- * Get payout requests for user
+ * Get payer requests for user
  */
 export const getPayoutRequests = async (userId: string): Promise<any[]> => {
   try {
@@ -287,4 +333,27 @@ export const getPayoutRequests = async (userId: string): Promise<any[]> => {
     console.error('Error fetching payout requests:', error);
     throw error;
   }
+};
+
+/**
+ * Filter user data to show only credits in wallet balance (remove negative expenses)
+ */
+export const getFilteredUserWalletBalance = (userData: any): any => {
+  if (!userData?.wallet) {
+    return {
+      balance: 0,
+      pendingBalance: 0,
+      totalEarnings: 0,
+    };
+  }
+
+  // Only show positive balances (credits/income) - no negative expenses
+  return {
+    ...userData,
+    wallet: {
+      balance: Math.max(0, userData.wallet.balance || 0),
+      pendingBalance: Math.max(0, userData.wallet.pendingBalance || 0),
+      totalEarnings: Math.max(0, userData.wallet.totalEarnings || 0),
+    }
+  };
 };

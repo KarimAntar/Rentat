@@ -1,43 +1,42 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, initializeAuth, Auth } from 'firebase/auth';
+import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, initializeFirestore, connectFirestoreEmulator, Firestore } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator, Functions } from 'firebase/functions';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Firebase configuration
-// @ts-ignore - Expo environment variables are available at runtime
+// Fallback values provided for robustness if env vars fail to load
 const firebaseConfig: any = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyAVzDQ-j-V1lMYeqOtyhc3GcSEAnaNVgr8",
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "rentat-app.firebaseapp.com",
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "rentat-app",
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "rentat-app.firebasestorage.app",
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "124866170143",
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:124866170143:web:4bc15004f9372d78a3742a",
 };
 
 // measurementId is optional
 // @ts-ignore - Expo environment variables are available at runtime
-const measurementId = process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID;
+const measurementId = process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-RWW5WL0LB0";
 if (measurementId) {
   firebaseConfig.measurementId = measurementId;
 }
 
 // Validate required configuration
 const requiredVars = [
-  { key: "EXPO_PUBLIC_FIREBASE_API_KEY", value: process.env.EXPO_PUBLIC_FIREBASE_API_KEY },
-  { key: "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN", value: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN },
-  { key: "EXPO_PUBLIC_FIREBASE_PROJECT_ID", value: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID },
-  { key: "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET", value: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET },
-  { key: "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", value: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID },
-  { key: "EXPO_PUBLIC_FIREBASE_APP_ID", value: process.env.EXPO_PUBLIC_FIREBASE_APP_ID },
-  // measurementId is optional
+  { key: "apiKey", value: firebaseConfig.apiKey },
+  { key: "authDomain", value: firebaseConfig.authDomain },
+  { key: "projectId", value: firebaseConfig.projectId },
+  { key: "storageBucket", value: firebaseConfig.storageBucket },
+  { key: "messagingSenderId", value: firebaseConfig.messagingSenderId },
+  { key: "appId", value: firebaseConfig.appId },
 ];
 
 for (const v of requiredVars) {
   if (!v.value) {
-    throw new Error(`Missing required Firebase configuration: ${v.key}`);
+    console.error(`Missing required Firebase configuration: ${v.key}`);
+    // We don't throw here to prevent immediate crash, but Firebase will likely fail to init
   }
 }
 
@@ -64,7 +63,12 @@ try {
  * This ensures the app connects to the correct Firestore instance.
  */
 let db: Firestore;
-db = initializeFirestore(app, { host: 'eur3-firestore.googleapis.com', ssl: true });
+try {
+  db = initializeFirestore(app, { host: 'eur3-firestore.googleapis.com', ssl: true });
+} catch (e) {
+  // If already initialized, get instance
+  db = getFirestore(app);
+}
 
 // Initialize Storage
 const storage: FirebaseStorage = getStorage(app);
@@ -85,7 +89,6 @@ if (__DEV__ && Constants.expoConfig?.extra?.useEmulators) {
 
   try {
     // Connect to Auth emulator
-    // Note: Auth emulator connection is handled differently in newer versions
     console.log('Auth emulator should be configured in app.json/app.config.js');
   } catch (error) {
     console.log('Auth emulator connection error:', error);
@@ -223,15 +226,5 @@ export const handleFirebaseError = (error: any): FirebaseError => {
   
   return new FirebaseError(code, message, error);
 };
-
-// Initialize Firebase App Check for production
-// TODO: Enable App Check in production when needed
-// if (!__DEV__ && Constants.expoConfig?.extra?.enableAppCheck) {
-//   const appCheckToken = process.env.EXPO_PUBLIC_FIREBASE_APP_CHECK_TOKEN;
-//   if (appCheckToken) {
-//     // Initialize App Check here when needed
-//     console.log('App Check would be initialized here');
-//   }
-// }
 
 export default app;

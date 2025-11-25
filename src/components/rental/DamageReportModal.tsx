@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -47,7 +48,7 @@ export default function DamageReportModal({
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant camera roll permissions to upload images');
+        showAlert('Permission Required', 'Please grant camera roll permissions to upload images');
         return;
       }
 
@@ -77,7 +78,7 @@ export default function DamageReportModal({
     } catch (error) {
       console.error('Error picking image:', error);
       setUploading(false);
-      Alert.alert('Error', 'Failed to pick image');
+      showAlert('Error', 'Failed to pick image');
     }
   };
 
@@ -89,23 +90,23 @@ export default function DamageReportModal({
     // Validate inputs
     if (hasDamage) {
       if (!description.trim()) {
-        Alert.alert('Error', 'Please provide a damage description');
+        showAlert('Error', 'Please provide a damage description');
         return;
       }
 
       const amount = parseFloat(deductionAmount);
       if (isNaN(amount) || amount < 0) {
-        Alert.alert('Error', 'Please enter a valid deduction amount');
+        showAlert('Error', 'Please enter a valid deduction amount');
         return;
       }
 
       if (amount > securityDeposit) {
-        Alert.alert('Error', `Deduction amount cannot exceed the security deposit (${currency} ${securityDeposit})`);
+        showAlert('Error', `Deduction amount cannot exceed the security deposit (${currency} ${securityDeposit})`);
         return;
       }
 
       if (images.length === 0) {
-        Alert.alert('Error', 'Please upload at least one image of the damage');
+        showAlert('Error', 'Please upload at least one image of the damage');
         return;
       }
     }
@@ -127,7 +128,7 @@ export default function DamageReportModal({
       onClose();
     } catch (error) {
       console.error('Error submitting damage report:', error);
-      Alert.alert('Error', 'Failed to submit damage report. Please try again.');
+      showAlert('Error', 'Failed to submit damage report. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -550,3 +551,5 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
 });
+
+

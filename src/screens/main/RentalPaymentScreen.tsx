@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -220,7 +221,7 @@ const RentalPaymentScreen: React.FC = () => {
                 paymobTransactionId: successfulTxn.id,
               },
             });
-            Alert.alert(
+            showAlert(
               'Payment Successful',
               'Your payment has been processed successfully!',
               [
@@ -248,7 +249,7 @@ const RentalPaymentScreen: React.FC = () => {
 
   const openPaymentGateway = async () => {
     if (!rental) {
-      Alert.alert('Error', 'Rental not loaded');
+      showAlert('Error', 'Rental not loaded');
       return;
     }
 
@@ -291,7 +292,7 @@ const RentalPaymentScreen: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error opening payment gateway:', error);
-      Alert.alert('Error', `Failed to open payment gateway: ${error.message || 'Unknown error'}`);
+      showAlert('Error', `Failed to open payment gateway: ${error.message || 'Unknown error'}`);
     } finally {
       setPaymentLoading(false);
     }
@@ -446,7 +447,7 @@ const RentalPaymentScreen: React.FC = () => {
             />
 
             <View style={styles.testCardsBox}>
-              <Text style={styles.testCardsTitle}>🎴 Test Card (Sandbox)</Text>
+              <Text style={styles.testCardsTitle}>ًںژ´ Test Card (Sandbox)</Text>
               <Text style={styles.testCardsText}>
                 Card: 4987654321098769{'\n'}
                 Expiry: Any future date{'\n'}
@@ -620,3 +621,5 @@ const styles = StyleSheet.create({
 });
 
 export default RentalPaymentScreen;
+
+

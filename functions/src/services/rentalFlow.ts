@@ -39,7 +39,15 @@ export async function confirmHandoverByRenter(
   }
 
   // Check if already confirmed
+  console.log(`Handover check: userId=${userId}, rental:`, {
+    renterId: rental.renterId,
+    ownerId: rental.ownerId,
+    status: rental.status,
+    handover: rental.handover
+  });
+
   if (rental.handover?.renterConfirmed) {
+    console.log('Handover confirmation blocked: Renter has already confirmed handover');
     throw new Error('Renter has already confirmed handover');
   }
 
@@ -176,84 +184,113 @@ export async function raiseDispute(
   userId: string,
   reason: string,
   evidence: string[]
-): Promise<{ success: boolean; disputeId: string }> {
-  const rentalRef = db.collection('rentals').doc(rentalId);
-  const rentalDoc = await rentalRef.get();
+): Promise<{ success: boolean; disputeId: string; message: string }> {
+  console.log(`raiseDispute called: rentalId=${rentalId}, userId=${userId}, reason=${reason}`);
 
-  if (!rentalDoc.exists) {
-    throw new Error('Rental not found');
-  }
+  try {
+    const rentalRef = db.collection('rentals').doc(rentalId);
+    const rentalDoc = await rentalRef.get();
 
-  const rental = rentalDoc.data()!;
+    if (!rentalDoc.exists) {
+      throw new Error(`Rental ${rentalId} not found`);
+    }
 
-  // Verify user is either owner or renter
-  const isOwner = rental.ownerId === userId;
-  const isRenter = rental.renterId === userId;
+    const rental = rentalDoc.data()!;
+    console.log(`Rental found: status=${rental.status}, ownerId=${rental.ownerId}, renterId=${rental.renterId}`);
 
-  if (!isOwner && !isRenter) {
-    throw new Error('Only rental participants can raise disputes');
-  }
+    // Verify user is either owner or renter
+    const isOwner = rental.ownerId === userId;
+    const isRenter = rental.renterId === userId;
 
-  // Check if rental can have disputes (must be active or completed)
-  if (rental.status !== 'active' && rental.status !== 'completed') {
-    throw new Error('Disputes can only be raised for active or completed rentals');
-  }
+    if (!isOwner && !isRenter) {
+      throw new Error(`User ${userId} is not authorized to raise disputes for rental ${rentalId}`);
+    }
 
-  // Check if dispute already exists
-  if (rental.dispute && rental.dispute.status !== 'resolved') {
-    throw new Error('An active dispute already exists for this rental');
-  }
+    // Check if rental can have disputes (must be active or completed)
+    if (rental.status !== 'active' && rental.status !== 'completed') {
+      throw new Error(`Cannot raise dispute for rental with status: ${rental.status}. Must be active or completed.`);
+    }
 
-  const now = admin.firestore.Timestamp.now();
+    // Check if dispute already exists
+    if (rental.dispute && rental.dispute.status !== 'resolved') {
+      throw new Error('An active dispute already exists for this rental');
+    }
 
-  await rentalRef.update({
-    status: 'disputed',
-    dispute: {
-      status: 'open',
-      initiatedBy: isOwner ? 'owner' : 'renter',
-      reason,
-      evidence,
-      initiatedAt: now,
-    },
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    timeline: admin.firestore.FieldValue.arrayUnion({
-      event: 'dispute_raised',
-      timestamp: now,
-      actor: userId,
-      details: {
-        initiatedBy: isOwner ? 'owner' : 'renter',
+    const now = admin.firestore.Timestamp.now();
+    const initiatedBy = isOwner ? 'owner' : 'renter';
+
+    console.log(`Creating dispute: status=disputed, initiatedBy=${initiatedBy}`);
+
+    // Update rental with dispute status and dispute data
+    await rentalRef.update({
+      status: 'disputed',
+      dispute: {
+        status: 'open',
+        initiatedBy,
         reason,
-        evidenceCount: evidence.length,
+        evidence,
+        initiatedAt: now,
       },
-    }),
-  });
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-  // Notify the other party and moderators
-  const otherPartyId = isOwner ? rental.renterId : rental.ownerId;
-  
-  // Create notification for other party
-  await db.collection('notifications').add({
-    userId: otherPartyId,
-    type: 'system',
-    title: 'Dispute Raised',
-    body: `A dispute has been raised for your rental. Reason: ${reason}`,
-    data: {
-      rentalId,
-      itemId: rental.itemId,
-      disputeStatus: 'open',
-    },
-    status: 'unread',
-    delivery: {
-      push: { sent: false },
-    },
-    priority: 'high',
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+    console.log('Rental status updated, now adding timeline entry');
 
-  return {
-    success: true,
-    disputeId: rentalId,
-  };
+    // Add timeline entry separately to avoid complex arrayUnion operations
+    await rentalRef.update({
+      timeline: admin.firestore.FieldValue.arrayUnion({
+        event: 'dispute_raised',
+        timestamp: now,
+        actor: userId,
+        details: {
+          initiatedBy,
+          reason,
+          evidenceCount: evidence.length,
+        },
+      }),
+    });
+
+    console.log('Timeline entry added, now sending notification');
+
+    // Notify the other party and moderators
+    const otherPartyId = isOwner ? rental.renterId : rental.ownerId;
+
+    try {
+      // Create notification for other party
+      await db.collection('notifications').add({
+        userId: otherPartyId,
+        type: 'system',
+        title: 'Dispute Raised',
+        body: `A dispute has been raised for your rental. Reason: ${reason}`,
+        data: {
+          rentalId,
+          itemId: rental.itemId,
+          disputeStatus: 'open',
+        },
+        status: 'unread',
+        delivery: {
+          push: { sent: false },
+        },
+        priority: 'high',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      console.log(`Notification sent to ${otherPartyId}`);
+    } catch (notifError) {
+      console.error('Error sending notification:', notifError);
+      // Don't fail the entire operation due to notification error
+    }
+
+    console.log(`Dispute raised successfully for rental ${rentalId}`);
+
+    return {
+      success: true,
+      disputeId: rentalId,
+      message: 'Dispute raised successfully'
+    };
+  } catch (error: any) {
+    console.error('Error in raiseDispute:', error);
+    throw error; // Re-throw to be handled by Firebase function
+  }
 }
 
 /**
@@ -401,6 +438,7 @@ export async function resolveDispute(
 /**
  * Phase 5: Wallet & Payouts
  * Get wallet balance with proper separation of Available vs Pending/Locked funds
+ * Only includes POSITIVE amounts (credits/income) - excludes negative amounts (expenses/payments)
  */
 export async function getWalletBalance(userId: string): Promise<{
   available: number;
@@ -424,6 +462,13 @@ export async function getWalletBalance(userId: string): Promise<{
   transactionsSnapshot.forEach((doc) => {
     const tx = doc.data();
     const amount = tx.amount || 0;
+
+    // Only include POSITIVE amounts (credits/income) in wallet calculations
+    // This excludes negative amounts (like rental payments made by the user)
+    if (amount <= 0) {
+      return; // Skip negative amounts/expenses
+    }
+
     const availabilityStatus = tx.availabilityStatus;
 
     if (availabilityStatus === 'AVAILABLE') {

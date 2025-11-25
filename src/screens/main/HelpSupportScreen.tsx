@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -34,7 +35,7 @@ const HelpSupportScreen: React.FC = () => {
         if (supported) {
           Linking.openURL(url);
         } else {
-          Alert.alert('Error', 'Unable to open the contact method');
+          showAlert('Error', 'Unable to open the contact method');
         }
       });
     }
@@ -365,3 +366,5 @@ const styles = StyleSheet.create({
 });
 
 export default HelpSupportScreen;
+
+

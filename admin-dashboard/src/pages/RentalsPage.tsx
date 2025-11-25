@@ -211,33 +211,26 @@ export const RentalsPage: React.FC = () => {
 
   const columns: GridColDef[] = [
     {
-      field: 'itemTitle',
+      field: 'itemInfo',
       headerName: 'Item',
-      flex: 1,
-      minWidth: 200,
-      valueGetter: (_value, row) => {
-        const item = items[row.itemId];
-        return item?.title || row.itemId || 'Unknown Item';
-      },
-    },
-    {
-      field: 'renterName',
-      headerName: 'Renter',
-      flex: 1,
-      minWidth: 150,
-      valueGetter: (_value, row) => {
-        const user = users[row.renterId];
-        return user?.displayName || user?.email || row.renterId || 'Unknown';
-      },
-    },
-    {
-      field: 'ownerName',
-      headerName: 'Owner',
-      flex: 1,
-      minWidth: 150,
-      valueGetter: (_value, row) => {
-        const user = users[row.ownerId];
-        return user?.displayName || user?.email || row.ownerId || 'Unknown';
+      flex: 2,
+      minWidth: 300,
+      renderCell: (params: GridRenderCellParams) => {
+        const rental = params.row as Rental;
+        const item = items[rental.itemId];
+        const renter = users[rental.renterId];
+        const owner = users[rental.ownerId];
+
+        return (
+          <Box>
+            <Typography variant="body2" fontWeight="bold">
+              {item?.title || 'Unknown Item'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {`Renter: ${renter?.displayName || 'Unknown'} • Owner: ${owner?.displayName || 'Unknown'}`}
+            </Typography>
+          </Box>
+        );
       },
     },
     {

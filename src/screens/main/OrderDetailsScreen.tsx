@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -50,14 +51,14 @@ const OrderDetailsScreen: React.FC = () => {
   const loadOrderDetails = async () => {
     if (!user) {
       setLoading(false);
-      Alert.alert('Error', 'Please log in to view order details');
+      showAlert('Error', 'Please log in to view order details');
       navigation.goBack();
       return;
     }
 
     if (!rentalId) {
       setLoading(false);
-      Alert.alert('Error', 'Invalid order ID');
+      showAlert('Error', 'Invalid order ID');
       navigation.goBack();
       return;
     }
@@ -69,7 +70,7 @@ const OrderDetailsScreen: React.FC = () => {
       const rental = await RentalService.getRental(rentalId) as OrderWithDetails;
       if (!rental) {
         setLoading(false);
-        Alert.alert('Error', 'Order not found');
+        showAlert('Error', 'Order not found');
         navigation.goBack();
         return;
       }
@@ -77,7 +78,7 @@ const OrderDetailsScreen: React.FC = () => {
       // Check permissions - user should be either owner or renter
       if (rental.ownerId !== user.uid && rental.renterId !== user.uid) {
         setLoading(false);
-        Alert.alert('Error', 'You do not have permission to view this order');
+        showAlert('Error', 'You do not have permission to view this order');
         navigation.goBack();
         return;
       }
@@ -129,7 +130,7 @@ const OrderDetailsScreen: React.FC = () => {
       setOrder(rental);
     } catch (error) {
       console.error('Error loading order details:', error);
-      Alert.alert('Error', 'Failed to load order details');
+      showAlert('Error', 'Failed to load order details');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -480,7 +481,7 @@ const OrderDetailsScreen: React.FC = () => {
               <TouchableOpacity
                 style={[styles.actionButton, styles.rejectButton]}
                 onPress={() => {
-                  Alert.alert(
+                  showAlert(
                     'Reject Order',
                     'Are you sure you want to reject this rental request?',
                     [
@@ -503,7 +504,7 @@ const OrderDetailsScreen: React.FC = () => {
               <TouchableOpacity
                 style={[styles.actionButton, styles.approveButton]}
                 onPress={() => {
-                  Alert.alert(
+                  showAlert(
                     'Approve Order',
                     'This will make the order ready for payment. Continue?',
                     [
@@ -807,3 +808,5 @@ const styles = StyleSheet.create({
 });
 
 export default OrderDetailsScreen;
+
+

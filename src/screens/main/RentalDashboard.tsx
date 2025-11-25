@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -75,7 +76,7 @@ const RentalDashboard: React.FC = () => {
       setRentals(enrichedRentals);
     } catch (error) {
       console.error('Error loading rentals:', error);
-      Alert.alert('Error', 'Failed to load rentals');
+      showAlert('Error', 'Failed to load rentals');
     } finally {
       setLoading(false);
       if (isRefresh) setRefreshing(false);
@@ -770,3 +771,5 @@ const styles = StyleSheet.create({
 });
 
 export default RentalDashboard;
+
+

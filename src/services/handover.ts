@@ -18,6 +18,8 @@ export interface ConfirmHandoverResult {
   success: boolean;
   bothConfirmed: boolean;
   message: string;
+  error?: string;
+  code?: string;
 }
 
 /**
@@ -34,9 +36,20 @@ export const confirmHandoverAsRenter = async (
 
     const result = await confirmHandover({ rentalId });
     return result.data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error confirming handover as renter:', error);
-    throw error;
+
+    // Extract Firebase error details for better error messages
+    const errorData = {
+      success: false,
+      bothConfirmed: false,
+      message: 'Failed to confirm handover',
+      error: error.message || 'Unknown error',
+      code: error.code || 'unknown'
+    };
+
+    // Return error data instead of throwing
+    return errorData;
   }
 };
 

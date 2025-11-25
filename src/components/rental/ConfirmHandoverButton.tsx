@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { showAlert } from '../../contexts/ModalContext';
 import { 
   confirmHandoverAsRenter, 
   confirmHandoverAsOwner,
@@ -29,7 +30,7 @@ export const ConfirmHandoverButton: React.FC<ConfirmHandoverButtonProps> = ({
   const canConfirm = canConfirmHandover(rental, currentUserId);
 
   const handleConfirm = async () => {
-    Alert.alert(
+    showAlert(
       'Confirm Handover',
       isOwner
         ? 'Confirm that you have handed over the item to the renter?'
@@ -46,7 +47,7 @@ export const ConfirmHandoverButton: React.FC<ConfirmHandoverButtonProps> = ({
                 : await confirmHandoverAsRenter(rental.id);
 
               if (result.success) {
-                Alert.alert(
+                showAlert(
                   'Success',
                   result.bothConfirmed
                     ? 'Both parties confirmed! Rental is now active.'
@@ -55,7 +56,7 @@ export const ConfirmHandoverButton: React.FC<ConfirmHandoverButtonProps> = ({
                 );
               }
             } catch (error: any) {
-              Alert.alert(
+              showAlert(
                 'Error',
                 error.message || 'Failed to confirm handover. Please try again.'
               );
@@ -114,3 +115,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+

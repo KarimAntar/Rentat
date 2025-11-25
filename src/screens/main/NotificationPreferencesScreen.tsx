@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -124,14 +125,14 @@ const NotificationPreferencesScreen: React.FC = () => {
         },
       });
 
-      Alert.alert(
+      showAlert(
         'Preferences Saved',
         'Your notification preferences have been updated successfully.',
         [{ text: 'OK' }]
       );
     } catch (error) {
       console.error('Error saving preferences:', error);
-      Alert.alert('Error', 'Failed to save preferences. Please try again.');
+      showAlert('Error', 'Failed to save preferences. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -528,3 +529,5 @@ const styles = StyleSheet.create({
 });
 
 export default NotificationPreferencesScreen;
+
+

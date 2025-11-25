@@ -21,6 +21,9 @@ interface ModalContextType {
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined);
 
+// Ref to hold the current modal context for showAlert function
+let modalContextRef: ModalContextType | null = null;
+
 export const useModal = () => {
   const context = useContext(ModalContext);
   if (!context) {
@@ -52,8 +55,22 @@ export const ModalProvider: React.FC<ModalProviderProps> = ({ children }) => {
     onPress();
   };
 
+  const contextValue = { showModal, hideModal };
+
+  // Update the ref with current context value for showAlert function
+  React.useEffect(() => {
+    modalContextRef = contextValue;
+    return () => {
+      modalContextRef = null;
+    };
+  }, []);
+
+  React.useLayoutEffect(() => {
+    modalContextRef = contextValue;
+  });
+
   return (
-    <ModalContext.Provider value={{ showModal, hideModal }}>
+    <ModalContext.Provider value={contextValue}>
       {children}
       {modalConfig && (
         <CustomModal
@@ -79,8 +96,7 @@ export const showAlert = (
   buttons?: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[],
   options?: { cancelable?: boolean; type?: 'info' | 'success' | 'warning' | 'error' }
 ) => {
-  const context = ModalContext as any;
-  if (context._currentValue) {
+  if (modalContextRef) {
     const modalButtons: ModalButton[] = [];
 
     if (buttons && buttons.length > 0) {
@@ -100,7 +116,7 @@ export const showAlert = (
       });
     }
 
-    context._currentValue.showModal({
+    modalContextRef.showModal({
       title,
       message: message || '',
       buttons: modalButtons,

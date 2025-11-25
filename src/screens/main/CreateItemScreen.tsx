@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -165,7 +166,7 @@ const CreateItemScreen: React.FC = () => {
         }));
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick images. Please try again.');
+      showAlert('Error', 'Failed to pick images. Please try again.');
     }
   };
 
@@ -184,7 +185,7 @@ const CreateItemScreen: React.FC = () => {
         }));
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      showAlert('Error', 'Failed to take photo. Please try again.');
     }
   };
 
@@ -251,13 +252,13 @@ const CreateItemScreen: React.FC = () => {
     console.log('Starting item submission...');
     
     if (!user) {
-      Alert.alert('Error', 'You must be logged in to create a listing');
+      showAlert('Error', 'You must be logged in to create a listing');
       return;
     }
 
     // Check email verification before allowing submission
     if (!user.emailVerified) {
-      Alert.alert(
+      showAlert(
         'Email Verification Required',
         'You need to verify your email address before you can list items.',
         [
@@ -283,7 +284,7 @@ const CreateItemScreen: React.FC = () => {
           !formData.dailyRate ||
           !formData.securityDeposit ||
           !formData.images?.length) {
-        Alert.alert('Error', 'Please fill in all required fields');
+        showAlert('Error', 'Please fill in all required fields');
         setLoading(false);
         return;
       }
@@ -372,7 +373,7 @@ const CreateItemScreen: React.FC = () => {
         } catch (imageError) {
           console.error('Error uploading images:', imageError);
           // Continue without images rather than failing completely
-          Alert.alert(
+          showAlert(
             'Warning', 
             'Images could not be uploaded, but your listing was created. You can add images later.'
           );
@@ -799,7 +800,7 @@ const CreateItemScreen: React.FC = () => {
             Condition: {CONDITIONS.find(c => c.value === formData.condition)?.label}
           </Text>
           <Text style={styles.reviewPrice}>
-            EGP {formData.dailyRate}/day • EGP {formData.securityDeposit} deposit
+            EGP {formData.dailyRate}/day â€¢ EGP {formData.securityDeposit} deposit
           </Text>
           <Text style={styles.reviewDescription} numberOfLines={3}>
             {formData.description}
@@ -1327,3 +1328,5 @@ const styles = StyleSheet.create({
 });
 
 export default CreateItemScreen;
+
+

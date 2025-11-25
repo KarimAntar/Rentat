@@ -3,7 +3,7 @@
  * Allows users to raise disputes on rentals
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,27 +11,21 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { showAlert } from '../../contexts/ModalContext';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { raiseDispute } from '../../services/disputes';
 
-interface CreateDisputeScreenProps {
-  route: {
-    params: {
-      rentalId: string;
-      rental: any;
-    };
+export const CreateDisputeScreen: React.FC = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { rentalId, rental } = route.params as {
+    rentalId: string;
+    rental: any;
   };
-  navigation: any;
-}
-
-export const CreateDisputeScreen: React.FC<CreateDisputeScreenProps> = ({
-  route,
-  navigation,
-}) => {
-  const { rentalId, rental } = route.params;
 
   const [reason, setReason] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -46,36 +40,78 @@ export const CreateDisputeScreen: React.FC<CreateDisputeScreenProps> = ({
     { id: 'other', label: '❓ Other', description: 'Other dispute reason' },
   ];
 
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  // 🔍 Debug function - TEST
+  const testCloudFunction = async () => {
+    console.log('🧪 Testing Cloud Function connection...');
+
+    const { httpsCallable } = require('firebase/functions');
+    const { functions } = require('../config/firebase');
+
+    try {
+      const testFunc = httpsCallable(functions, 'testFunction');
+      const result = await testFunc({ testData: 'hello world', rentalId });
+      console.log('✅ testFunction result:', result);
+      alert('Cloud Function working! Check console for details.');
+    } catch (error: any) {
+      console.error('❌ testFunction error:', error);
+      alert('Cloud Function error: ' + error.message);
+    }
+  };
+
   const handleSubmit = async () => {
+    console.log('🎯 DISPUTE SUBMIT STARTED');
+    console.log('🎯 Rental data:', { rentalId, rentalIdFromRoute: rentalId, rentalStatus: rental?.status });
+    console.log('🎯 Selected category:', selectedCategory);
+    console.log('🎯 Reason:', reason);
+    console.log('🎯 Evidence count:', evidence.length);
+
     if (!selectedCategory) {
-      Alert.alert('Error', 'Please select a dispute category');
+      showAlert('Category Required', 'Please select an issue category to continue.', [
+        { text: 'OK', onPress: () => setFocusedField('category') }
+      ]);
       return;
     }
 
     if (!reason.trim()) {
-      Alert.alert('Error', 'Please provide a detailed description');
+      showAlert('Description Required', 'Please provide a detailed description of the issue.', [
+        { text: 'OK', onPress: () => setFocusedField('description') }
+      ]);
       return;
     }
 
-    Alert.alert(
+    showAlert(
       'Confirm Dispute',
       'Are you sure you want to raise a dispute? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
+          text: 'TEST FIRST',
+          style: 'default',
+          onPress: testCloudFunction,
+        },
+        {
           text: 'Submit',
           style: 'destructive',
           onPress: async () => {
+            console.log('🚀 SUBMITTING DISPUTE');
+
             setLoading(true);
             try {
+              const disputeReason = `[${selectedCategory}] ${reason}`;
+              console.log('📋 Dispute data:', { rentalId, reason: disputeReason, evidenceCount: evidence.length });
+
               const result = await raiseDispute({
                 rentalId,
-                reason: `[${selectedCategory}] ${reason}`,
+                reason: disputeReason,
                 evidence,
               });
 
+              console.log('✅ Dispute created result:', result);
+
               if (result.success) {
-                Alert.alert(
+                showAlert(
                   'Dispute Created',
                   'Your dispute has been submitted. A moderator will review it shortly.',
                   [
@@ -87,7 +123,14 @@ export const CreateDisputeScreen: React.FC<CreateDisputeScreenProps> = ({
                 );
               }
             } catch (error: any) {
-              Alert.alert(
+              console.error('❌ Dispute creation error:', error);
+              console.error('❌ Error details:', {
+                message: error?.message,
+                code: error?.code,
+                stack: error?.stack
+              });
+
+              showAlert(
                 'Error',
                 error.message || 'Failed to create dispute. Please try again.'
               );
@@ -100,13 +143,39 @@ export const CreateDisputeScreen: React.FC<CreateDisputeScreenProps> = ({
     );
   };
 
-  const handleAddEvidence = () => {
-    // TODO: Implement image picker
-    Alert.alert(
-      'Add Evidence',
-      'Image picker functionality will be implemented here'
-    );
-  };
+  const handleAddEvidence = useCallback(async () => {
+    try {
+      // Request camera permissions on iOS
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showAlert(
+          'Permission needed',
+          'Photo access is required to add evidence',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newEvidence = [...evidence, result.assets[0].uri];
+        setEvidence(newEvidence);
+        console.log('Added evidence:', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      showAlert(
+        'Error',
+        'Failed to add photo/video. Please try again.'
+      );
+    }
+  }, [evidence]);
 
   return (
     <ScrollView style={styles.container}>
@@ -235,6 +304,8 @@ export const CreateDisputeScreen: React.FC<CreateDisputeScreenProps> = ({
     </ScrollView>
   );
 };
+
+export default CreateDisputeScreen;
 
 const styles = StyleSheet.create({
   container: {

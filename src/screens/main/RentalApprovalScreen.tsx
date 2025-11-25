@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
   Image,
 } from 'react-native';
+import { showAlert } from '../../contexts/ModalContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -50,13 +50,13 @@ const RentalApprovalScreen: React.FC = () => {
       
       const rentalData = await RentalService.getRental(rentalId);
       if (!rentalData) {
-        Alert.alert('Error', 'Rental request not found');
+        showAlert('Error', 'Rental request not found');
         navigation.goBack();
         return;
       }
 
       if (rentalData.ownerId !== user?.uid) {
-        Alert.alert('Error', 'You are not authorized to view this rental request');
+        showAlert('Error', 'You are not authorized to view this rental request');
         navigation.goBack();
         return;
       }
@@ -73,7 +73,7 @@ const RentalApprovalScreen: React.FC = () => {
       setRenter(renterData);
     } catch (error) {
       console.error('Error loading rental data:', error);
-      Alert.alert('Error', 'Failed to load rental request');
+      showAlert('Error', 'Failed to load rental request');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -83,7 +83,7 @@ const RentalApprovalScreen: React.FC = () => {
   const handleApprove = async () => {
     if (!rental) return;
 
-    Alert.alert(
+    showAlert(
       'Approve Rental Request',
       'Are you sure you want to approve this rental request? The renter will be notified and can proceed with payment.',
       [
@@ -141,7 +141,7 @@ const RentalApprovalScreen: React.FC = () => {
               // 3. Initiate payment flow
               // 4. Update item availability
 
-              Alert.alert(
+              showAlert(
                 'Request Approved!',
                 'The rental request has been approved. The renter will be notified and can proceed with payment.',
                 [
@@ -153,7 +153,7 @@ const RentalApprovalScreen: React.FC = () => {
               );
             } catch (error) {
               console.error('Error approving rental:', error);
-              Alert.alert('Error', 'Failed to approve rental request');
+              showAlert('Error', 'Failed to approve rental request');
             } finally {
               setActionLoading(false);
             }
@@ -167,7 +167,7 @@ const RentalApprovalScreen: React.FC = () => {
     if (!rental) return;
     
     if (!rejectionReason.trim()) {
-      Alert.alert('Rejection Reason Required', 'Please provide a reason for rejecting this request');
+      showAlert('Rejection Reason Required', 'Please provide a reason for rejecting this request');
       return;
     }
 
@@ -222,7 +222,7 @@ const RentalApprovalScreen: React.FC = () => {
       // 2. Update item availability
       // 3. Log rejection for analytics
 
-      Alert.alert(
+      showAlert(
         'Request Rejected',
         'The rental request has been rejected. The renter will be notified.',
         [
@@ -234,7 +234,7 @@ const RentalApprovalScreen: React.FC = () => {
       );
     } catch (error) {
       console.error('Error rejecting rental:', error);
-      Alert.alert('Error', 'Failed to reject rental request');
+      showAlert('Error', 'Failed to reject rental request');
     } finally {
       setActionLoading(false);
     }

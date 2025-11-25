@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import {
-  getDetailedWalletBalance,
+  getCreditsOnlyWalletBalance,
   formatCurrency,
   getBalanceTypeColor,
   calculateBalancePercentage,
@@ -34,7 +34,7 @@ export const WalletBalanceCard: React.FC<WalletBalanceCardProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const data = await getDetailedWalletBalance(userId);
+      const data = await getCreditsOnlyWalletBalance(userId);
       setBalance(data);
       onRefresh?.();
     } catch (err: any) {

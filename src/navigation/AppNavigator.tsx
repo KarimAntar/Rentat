@@ -11,6 +11,7 @@ import UserGreeting from '../components/UserGreeting';
 
 // Import screens
 import LoginScreen from '../screens/auth/LoginScreen';
+import CreateDisputeScreen from '../screens/main/CreateDisputeScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import EmailVerificationScreen from '../screens/auth/EmailVerificationScreen';
@@ -541,7 +542,7 @@ const AppNavigator: React.FC = () => {
         />
         <RootStack.Screen
           name="CreateDispute"
-          component={require('../screens/main/CreateDisputeScreen').default}
+          component={CreateDisputeScreen}
           options={{
             headerShown: true,
             title: 'Report Issue',
@@ -559,6 +560,11 @@ const AppNavigator: React.FC = () => {
               fontSize: 18,
             },
           }}
+        />
+        <RootStack.Screen
+          name="OrderDetails"
+          component={require('../screens/main/OrderDetailsScreen').default}
+          options={{ headerShown: false }}
         />
       </RootStack.Navigator>
 

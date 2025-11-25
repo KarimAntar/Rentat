@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -147,11 +148,11 @@ const KYCVerificationScreen: React.FC = () => {
       if (supported) {
         await Linking.openURL(verificationUrl);
       } else {
-        Alert.alert('Error', 'Unable to open verification link');
+        showAlert('Error', 'Unable to open verification link');
       }
     } catch (error) {
       console.error('Error opening verification link:', error);
-      Alert.alert('Error', 'Failed to open verification. Please try again.');
+      showAlert('Error', 'Failed to open verification. Please try again.');
     }
   };
 
@@ -314,7 +315,7 @@ const KYCVerificationScreen: React.FC = () => {
           <Button
             title="Contact Support"
             onPress={() => {
-              Alert.alert(
+              showAlert(
                 'Contact Support',
                 'Please email support@rentat.com for assistance with your verification.',
                 [{ text: 'OK' }]
@@ -362,13 +363,13 @@ const KYCVerificationScreen: React.FC = () => {
                   onPress={() => {
                     // Copy URL to clipboard (if available)
                     // For now, just show alert with URL
-                    Alert.alert(
+                    showAlert(
                       'Verification URL',
                       verificationUrl,
                       [
                         { text: 'Copy URL', onPress: () => {
                           // In a real app, you'd use Clipboard.setString()
-                          Alert.alert('Copied!', 'URL copied to clipboard');
+                          showAlert('Copied!', 'URL copied to clipboard');
                         }},
                         { text: 'Cancel', style: 'cancel' }
                       ]
@@ -696,3 +697,5 @@ const styles = StyleSheet.create({
 });
 
 export default KYCVerificationScreen;
+
+

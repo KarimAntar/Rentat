@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
   Image,
 } from 'react-native';
@@ -15,6 +14,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Button from '../../components/ui/Button';
 import { ReviewService, RentalService, ItemService, UserService } from '../../services/firestore';
 import { useAuthContext } from '../../contexts/AuthContext';
+import { showAlert } from '../../contexts/ModalContext';
 import { Rental, Item, User, Review } from '../../types';
 
 interface ReviewScreenProps {
@@ -57,7 +57,7 @@ const ReviewScreen: React.FC = () => {
 
       const rentalData = await RentalService.getRental(rentalId);
       if (!rentalData) {
-        Alert.alert('Error', 'Rental not found');
+        showAlert('Error', 'Rental not found');
         navigation.goBack();
         return;
       }
@@ -67,13 +67,13 @@ const ReviewScreen: React.FC = () => {
       const isRenter = rentalData.renterId === user?.uid;
 
       if (reviewType === 'owner-to-renter' && !isOwner) {
-        Alert.alert('Unauthorized', 'Only the owner can leave this review');
+        showAlert('Unauthorized', 'Only the owner can leave this review');
         navigation.goBack();
         return;
       }
 
       if (reviewType === 'renter-to-owner' && !isRenter) {
-        Alert.alert('Unauthorized', 'Only the renter can leave this review');
+        showAlert('Unauthorized', 'Only the renter can leave this review');
         navigation.goBack();
         return;
       }
@@ -91,7 +91,7 @@ const ReviewScreen: React.FC = () => {
 
     } catch (error) {
       console.error('Error loading review data:', error);
-      Alert.alert('Error', 'Failed to load review data');
+      showAlert('Error', 'Failed to load review data');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -102,12 +102,12 @@ const ReviewScreen: React.FC = () => {
     if (!rental || !user || !reviewee) return;
 
     if (overallRating === 0) {
-      Alert.alert('Rating Required', 'Please provide an overall rating');
+      showAlert('Rating Required', 'Please provide an overall rating');
       return;
     }
 
     if (!comment.trim()) {
-      Alert.alert('Comment Required', 'Please provide a review comment');
+      showAlert('Comment Required', 'Please provide a review comment');
       return;
     }
 
@@ -141,7 +141,7 @@ const ReviewScreen: React.FC = () => {
 
       await ReviewService.createReview(reviewData);
 
-      Alert.alert(
+      showAlert(
         'Review Submitted',
         'Thank you for your feedback! Your review helps build trust in our community.',
         [
@@ -154,7 +154,7 @@ const ReviewScreen: React.FC = () => {
 
     } catch (error) {
       console.error('Error submitting review:', error);
-      Alert.alert('Error', 'Failed to submit review. Please try again.');
+      showAlert('Error', 'Failed to submit review. Please try again.');
     } finally {
       setSubmitting(false);
     }

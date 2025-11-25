@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -101,7 +102,7 @@ const PaymobTestScreen: React.FC = () => {
       setTimeout(() => checkOrderStatus(), 1000);
     } catch (error: any) {
       console.error('Payment flow failed:', error);
-      Alert.alert('Error', `Payment failed: ${error.message}`);
+      showAlert('Error', `Payment failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -177,7 +178,7 @@ const PaymobTestScreen: React.FC = () => {
       console.log(`Filtered transactions for order ${orderId}:`, orderTransactions.length);
       
       if (orderTransactions.length === 0) {
-        console.log('⚠️ No transactions found yet for order:', orderId);
+        console.log('âڑ ï¸ڈ No transactions found yet for order:', orderId);
         console.log('All transaction orders:', transactions.map((t: any) => ({ id: t.id, order: t.order })));
         setOrderStatus({
           id: orderId,
@@ -196,7 +197,7 @@ const PaymobTestScreen: React.FC = () => {
       // Check if all transactions failed
       const allFailed = orderTransactions.every((t: any) => !t.success && !t.pending);
       
-      console.log('✅ Order status updated:', {
+      console.log('âœ… Order status updated:', {
         orderId,
         transactions: orderTransactions.length,
         isPaid,
@@ -264,7 +265,7 @@ const PaymobTestScreen: React.FC = () => {
             />
 
             <View style={styles.testCardsBox}>
-              <Text style={styles.testCardsTitle}>🎴 Test Card (Sandbox)</Text>
+              <Text style={styles.testCardsTitle}>ًںژ´ Test Card (Sandbox)</Text>
               <Text style={styles.testCardsText}>
                 Card: 4987654321098769{'\n'}
                 Expiry: Any future date{'\n'}
@@ -293,7 +294,7 @@ const PaymobTestScreen: React.FC = () => {
                     styles.statusBadge,
                     orderStatus.is_paid ? styles.badgePaid : orderStatus.is_failed ? styles.badgeFailed : styles.badgePending
                   ]}>
-                    {orderStatus.is_paid ? '✅ Paid' : orderStatus.is_failed ? '❌ Failed' : '⏳ Pending'}
+                    {orderStatus.is_paid ? 'âœ… Paid' : orderStatus.is_failed ? 'â‌Œ Failed' : 'âڈ³ Pending'}
                   </Text>
                   {loadingStatus && (
                     <ActivityIndicator size="small" color="#4639eb" />
@@ -329,14 +330,14 @@ const PaymobTestScreen: React.FC = () => {
                             styles.transactionStatus,
                             txn.success ? styles.txnSuccess : styles.txnPending
                           ]}>
-                            {txn.success ? '✓ Success' : txn.pending ? '⏳ Pending' : '✗ Failed'}
+                            {txn.success ? 'âœ“ Success' : txn.pending ? 'âڈ³ Pending' : 'âœ— Failed'}
                           </Text>
                         </View>
                         {txn.source_data && (
                           <View style={styles.transactionRow}>
                             <Text style={styles.transactionLabel}>Card:</Text>
                             <Text style={styles.transactionValue}>
-                              {txn.source_data.type} •••• {txn.source_data.pan?.slice(-4)}
+                              {txn.source_data.type} â€¢â€¢â€¢â€¢ {txn.source_data.pan?.slice(-4)}
                             </Text>
                           </View>
                         )}
@@ -364,7 +365,7 @@ const PaymobTestScreen: React.FC = () => {
             </View>
 
             <Button
-              title="🔄 Refresh Status"
+              title="ًں”„ Refresh Status"
               onPress={checkOrderStatus}
               loading={loadingStatus}
               disabled={loadingStatus}
@@ -591,3 +592,5 @@ const styles = StyleSheet.create({
 });
 
 export default PaymobTestScreen;
+
+

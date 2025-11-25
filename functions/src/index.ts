@@ -15,7 +15,6 @@ import {
   getWalletBalance,
 } from './services/rentalFlow';
 
-
 const paymob = PaymobFunctionsService.initialize({
   apiKey: config.paymob.apiKey,
   integrationId: config.paymob.integrationId,
@@ -31,7 +30,7 @@ initializeFirebaseAdmin();
 
 // Set global options
 setGlobalOptions({
-  region: 'us-central1',
+  region: 'europe-west1',
   maxInstances: 10,
 });
 
@@ -325,8 +324,53 @@ app.post('/paymob-webhook', express.json(), async (req, res) => {
 
     return res.json({ received: true });
   } catch (error) {
-    console.error('Error handling Paymob webhook:', error);
-    return res.status(500).send('Webhook handler failed');
+    console.error('Error confirming handover by renter:', error);
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to confirm handover');
+  }
+});
+
+export const confirmHandoverOwner = onCall(async (request) => {
+  const { auth, data } = request;
+
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { rentalId } = data;
+
+  try {
+    const result = await confirmHandoverByOwner(rentalId, auth.uid);
+
+    // Send notification to renter
+    const rentalDoc = await db.collection('rentals').doc(rentalId).get();
+    const rental = rentalDoc.data()!;
+
+    await sendNotification(rental.renterId, {
+      type: 'rental_update',
+      title: 'Handover Confirmed',
+      body: result.bothConfirmed
+        ? 'Both parties confirmed - rental is now active!'
+        : 'Owner confirmed handing over the item',
+      data: { rentalId, itemId: rental.itemId },
+    });
+
+    // Return success result
+    return {
+      success: true,
+      bothConfirmed: result.bothConfirmed,
+      message: result.bothConfirmed ? 'Both parties confirmed - rental is now active!' : 'Handover confirmed successfully',
+    };
+  } catch (error: any) {
+    console.error('Error confirming handover by owner:', error);
+
+    // Return specific error information
+    return {
+      success: false,
+      bothConfirmed: false,
+      message: 'Failed to confirm handover',
+      error: error.message || 'Unknown error occurred',
+      code: error.code || 'unknown_error',
+    };
   }
 });
 
@@ -2000,7 +2044,7 @@ async function completeRentalTransaction(rentalId: string, rental: any) {
 // Phase 3: Handover confirmation endpoints
 export const confirmHandoverRenter = onCall(async (request) => {
   const { auth, data } = request;
-  
+
   if (!auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -2009,11 +2053,11 @@ export const confirmHandoverRenter = onCall(async (request) => {
 
   try {
     const result = await confirmHandoverByRenter(rentalId, auth.uid);
-    
+
     // Send notification to owner
     const rentalDoc = await db.collection('rentals').doc(rentalId).get();
     const rental = rentalDoc.data()!;
-    
+
     await sendNotification(rental.ownerId, {
       type: 'rental_update',
       title: 'Handover Confirmed',
@@ -2023,66 +2067,122 @@ export const confirmHandoverRenter = onCall(async (request) => {
       data: { rentalId, itemId: rental.itemId },
     });
 
-    return result;
-  } catch (error) {
+    // Return success result
+    return {
+      success: true,
+      bothConfirmed: result.bothConfirmed,
+      message: result.bothConfirmed ? 'Both parties confirmed - rental is now active!' : 'Handover confirmed successfully',
+    };
+  } catch (error: any) {
     console.error('Error confirming handover by renter:', error);
-    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to confirm handover');
+
+    // Convert regular JS errors to Firebase HttpsError to trigger error response
+    const errorMessage = error.message || 'Unknown error occurred';
+    throw new HttpsError('internal', `Failed to confirm handover: ${errorMessage}`, {
+      error: errorMessage,
+      code: 'internal_error',
+    });
   }
 });
 
-export const confirmHandoverOwner = onCall(async (request) => {
+// Test function for debugging
+export const testFunction = onCall(async (request) => {
   const { auth, data } = request;
-  
-  if (!auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated');
-  }
 
-  const { rentalId } = data;
+  console.log('🧪 testFunction called with data:', data);
+  console.log('🧪 auth provided:', !!auth);
 
-  try {
-    const result = await confirmHandoverByOwner(rentalId, auth.uid);
-    
-    // Send notification to renter
-    const rentalDoc = await db.collection('rentals').doc(rentalId).get();
-    const rental = rentalDoc.data()!;
-    
-    await sendNotification(rental.renterId, {
-      type: 'rental_update',
-      title: 'Handover Confirmed',
-      body: result.bothConfirmed
-        ? 'Both parties confirmed - rental is now active!'
-        : 'Owner confirmed handing over the item',
-      data: { rentalId, itemId: rental.itemId },
-    });
-
-    return result;
-  } catch (error) {
-    console.error('Error confirming handover by owner:', error);
-    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to confirm handover');
-  }
+  return {
+    success: true,
+    message: 'Test function executed successfully',
+    timestamp: new Date().toISOString(),
+    data: data
+  };
 });
 
 // Phase 4: Dispute management endpoints
 export const createDispute = onCall(async (request) => {
-  const { auth, data } = request;
-  
-  if (!auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated');
-  }
-
-  const { rentalId, reason, evidence } = data;
+  console.log('🚀 createDispute Cloud Function STARTED');
+  console.log('🚀 Request received:', { hasAuth: !!request.auth, dataKeys: Object.keys(request.data || {}) });
 
   try {
-    return await raiseDispute(rentalId, auth.uid, reason, evidence || []);
-  } catch (error) {
-    console.error('Error raising dispute:', error);
-    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to raise dispute');
+    const { auth, data } = request;
+
+    if (!auth) {
+      console.log('❌ No authentication');
+      throw new HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    console.log('✅ Authenticated user:', auth.uid);
+
+    const { rentalId, reason, evidence = [] } = data;
+
+    console.log('📋 Extracted data:', {
+      rentalId,
+      reasonLength: reason?.length || 0,
+      evidenceCount: evidence.length
+    });
+
+    // Basic validation
+    if (!rentalId) {
+      console.log('❌ Missing rentalId');
+      throw new HttpsError('invalid-argument', 'Rental ID is required');
+    }
+
+    if (!reason || reason.trim() === '') {
+      console.log('❌ Missing or empty reason');
+      throw new HttpsError('invalid-argument', 'Reason is required');
+    }
+
+    console.log('✅ Basic validation passed, about to check rental existence...');
+
+    // Check if rental exists first
+    const rentalRef = db.collection('rentals').doc(rentalId);
+    const rentalDoc = await rentalRef.get();
+
+    if (!rentalDoc.exists) {
+      console.log('❌ Rental does not exist:', rentalId);
+      throw new HttpsError('not-found', `Rental ${rentalId} not found`);
+    }
+
+    const rental = rentalDoc.data()!;
+    console.log('✅ Rental exists:', {
+      rentalId,
+      status: rental.status,
+      ownerId: rental.ownerId,
+      renterId: rental.renterId,
+      userId: auth.uid
+    });
+
+    console.log('🏃 About to call raiseDispute service function...');
+    const result = await raiseDispute(rentalId, auth.uid, reason, evidence);
+    console.log('✅ raiseDispute service returned successfully:', result);
+
+    return result;
+  } catch (error: any) {
+    console.error('❌ Error in createDispute Cloud Function:', error);
+    console.error('❌ Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+
+    // If it's already an HttpsError, re-throw as-is
+    if (error instanceof HttpsError) {
+      console.log('❌ Rethrowing HttpsError:', error.code, error.message);
+      throw error;
+    }
+
+    // For any other error, wrap it
+    console.log('❌ Wrapping error as internal error');
+    throw new HttpsError('internal', `Dispute creation failed: ${error.message || 'Unknown error'}`);
   }
 });
 
 export const resolveDisputeFunction = onCall(async (request) => {
   const { auth, data } = request;
-  
+
   if (!auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -2093,7 +2193,7 @@ export const resolveDisputeFunction = onCall(async (request) => {
     // Verify user has moderator role
     const userDoc = await db.collection('users').doc(auth.uid).get();
     const user = userDoc.data();
-    
+
     if (!user?.isModerator && !user?.isAdmin) {
       throw new HttpsError('permission-denied', 'Only moderators can resolve disputes');
     }
@@ -2114,7 +2214,7 @@ export const resolveDisputeFunction = onCall(async (request) => {
 // Phase 5: Wallet balance endpoint
 export const getWalletBalanceFunction = onCall(async (request) => {
   const { auth, data } = request;
-  
+
   if (!auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -2125,7 +2225,7 @@ export const getWalletBalanceFunction = onCall(async (request) => {
   if (userId !== auth.uid) {
     const userDoc = await db.collection('users').doc(auth.uid).get();
     const user = userDoc.data();
-    
+
     if (!user?.isAdmin) {
       throw new HttpsError('permission-denied', 'Cannot view other users wallets');
     }
@@ -2135,6 +2235,6 @@ export const getWalletBalanceFunction = onCall(async (request) => {
     return await getWalletBalance(userId);
   } catch (error) {
     console.error('Error getting wallet balance:', error);
-    throw new HttpsError('internal', 'Failed to get wallet balance');
+    throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to get wallet balance');
   }
 });

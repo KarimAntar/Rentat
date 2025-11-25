@@ -6,11 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/ui/Button';
+import { showAlert } from '../../contexts/ModalContext';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useUserBalance, useUserTransactions } from '../../hooks/useFirestore';
 import { commissionService } from '../../services/commission';
@@ -74,12 +74,12 @@ const WalletScreen: React.FC = () => {
       const errorMessage = error.message || 'Unknown error';
       
       if (errorMessage === 'KYC_REQUIRED') {
-        Alert.alert(
+        showAlert(
           'Verification Required',
           'You need to complete identity verification before you can withdraw funds. This helps keep our community safe and secure.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { 
+            {
               text: 'Verify Now',
               onPress: () => {
                 // Navigate to verification screen
@@ -89,27 +89,27 @@ const WalletScreen: React.FC = () => {
           ]
         );
       } else if (errorMessage === 'KYC_IN_PROGRESS') {
-        Alert.alert(
+        showAlert(
           'Verification In Progress',
           'Your identity verification is currently in progress. Please wait for it to be completed before withdrawing funds.'
         );
       } else if (errorMessage === 'KYC_IN_REVIEW') {
-        Alert.alert(
+        showAlert(
           'Verification Under Review',
           'Your identity verification is under review. We will notify you once it has been completed.'
         );
       } else if (errorMessage === 'KYC_REJECTED') {
-        Alert.alert(
+        showAlert(
           'Verification Rejected',
           'Your identity verification was rejected. Please contact support for more information.'
         );
       } else if (errorMessage === 'KYC_EXPIRED') {
-        Alert.alert(
+        showAlert(
           'Verification Expired',
           'Your identity verification has expired. Please complete the verification process again.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { 
+            {
               text: 'Verify Again',
               onPress: () => {
                 // Navigate to verification screen
@@ -119,7 +119,7 @@ const WalletScreen: React.FC = () => {
           ]
         );
       } else {
-        Alert.alert('Error', 'Failed to process withdrawal. Please try again.');
+        showAlert('Error', 'Failed to process withdrawal. Please try again.');
       }
     }
   };

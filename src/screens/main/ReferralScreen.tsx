@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -47,7 +48,7 @@ const ReferralScreen: React.FC = () => {
       setPrograms(activePrograms);
     } catch (error) {
       console.error('Error loading referral data:', error);
-      Alert.alert('Error', 'Failed to load referral data');
+      showAlert('Error', 'Failed to load referral data');
     } finally {
       setLoading(false);
     }
@@ -60,9 +61,9 @@ const ReferralScreen: React.FC = () => {
     try {
       const newCode = await referralService.generateReferralCode(user.uid, programId);
       setReferralCodes(prev => [newCode, ...prev]);
-      Alert.alert('Success', 'New referral code generated!');
+      showAlert('Success', 'New referral code generated!');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to generate referral code');
+      showAlert('Error', error.message || 'Failed to generate referral code');
     } finally {
       setGeneratingCode(false);
     }
@@ -71,14 +72,14 @@ const ReferralScreen: React.FC = () => {
   const handleCopyCode = async (code: string) => {
     try {
       await Clipboard.setString(code);
-      Alert.alert('Copied!', 'Referral code copied to clipboard');
+      showAlert('Copied!', 'Referral code copied to clipboard');
     } catch (error) {
       console.error('Error copying code:', error);
     }
   };
 
   const handleShareCode = () => {
-    Alert.alert('Shared!', 'Referral code shared successfully');
+    showAlert('Shared!', 'Referral code shared successfully');
   };
 
   const getProgramForCode = (code: ReferralCode): ReferralProgram | undefined => {
@@ -250,11 +251,11 @@ const ReferralScreen: React.FC = () => {
         <View style={styles.termsSection}>
           <Text style={styles.termsTitle}>Terms & Conditions</Text>
           <Text style={styles.termsText}>
-            • Referral codes are valid for 90 days{'\n'}
-            • Only new users can use referral codes{'\n'}
-            • Rewards are granted after friend's first completed rental{'\n'}
-            • Maximum 50 referrals per user{'\n'}
-            • Program terms may change at any time
+            â€¢ Referral codes are valid for 90 days{'\n'}
+            â€¢ Only new users can use referral codes{'\n'}
+            â€¢ Rewards are granted after friend's first completed rental{'\n'}
+            â€¢ Maximum 50 referrals per user{'\n'}
+            â€¢ Program terms may change at any time
           </Text>
         </View>
       </ScrollView>
@@ -469,3 +470,5 @@ const styles = StyleSheet.create({
 });
 
 export default ReferralScreen;
+
+

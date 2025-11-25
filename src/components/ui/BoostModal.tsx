@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -49,7 +50,7 @@ export const BoostModal: React.FC<BoostModalProps> = ({
       setBoostPackages(packages);
     } catch (error) {
       console.error('Error loading boost packages:', error);
-      Alert.alert('Error', 'Failed to load boost packages');
+      showAlert('Error', 'Failed to load boost packages');
     }
   };
 
@@ -77,7 +78,7 @@ export const BoostModal: React.FC<BoostModalProps> = ({
       // 2. Process payment through Stripe
       // For now, we'll simulate the purchase
 
-      Alert.alert(
+      showAlert(
         'Purchase Boost',
         `Are you sure you want to purchase "${selectedPackage.name}" for $${(selectedPackage.price / 100).toFixed(2)}?`,
         [
@@ -96,7 +97,7 @@ export const BoostModal: React.FC<BoostModalProps> = ({
                   paymentMethodId
                 );
 
-                Alert.alert(
+                showAlert(
                   'Success!',
                   `Your item "${itemTitle}" has been boosted with ${selectedPackage.name}!`,
                   [{ text: 'OK', onPress: () => {
@@ -105,14 +106,14 @@ export const BoostModal: React.FC<BoostModalProps> = ({
                   }}]
                 );
               } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to purchase boost');
+                showAlert('Error', error.message || 'Failed to purchase boost');
               }
             },
           },
         ]
       );
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to initiate boost purchase');
+      showAlert('Error', error.message || 'Failed to initiate boost purchase');
     } finally {
       setLoading(false);
     }
@@ -144,7 +145,7 @@ export const BoostModal: React.FC<BoostModalProps> = ({
           <View style={styles.header}>
             <Text style={styles.title}>Boost Your Listing</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Text style={styles.closeText}>✕</Text>
+              <Text style={styles.closeText}>âœ•</Text>
             </TouchableOpacity>
           </View>
 
@@ -292,3 +293,5 @@ const styles = StyleSheet.create({
 });
 
 export default BoostModal;
+
+

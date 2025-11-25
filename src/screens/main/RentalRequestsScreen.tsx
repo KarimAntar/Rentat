@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -50,7 +51,7 @@ const RentalRequestsScreen: React.FC = () => {
       setRequests(filteredRequests);
     } catch (error) {
       console.error('Error loading rental requests:', error);
-      Alert.alert('Error', 'Failed to load rental requests');
+      showAlert('Error', 'Failed to load rental requests');
     } finally {
       setLoading(false);
     }
@@ -60,15 +61,15 @@ const RentalRequestsScreen: React.FC = () => {
     try {
       if (action === 'approve') {
         await RentalService.approveRental(requestId);
-        Alert.alert('Success', 'Rental request approved!');
+        showAlert('Success', 'Rental request approved!');
       } else {
         await RentalService.rejectRental(requestId);
-        Alert.alert('Success', 'Rental request rejected.');
+        showAlert('Success', 'Rental request rejected.');
       }
       loadRequests(); // Refresh the list
     } catch (error) {
       console.error('Error updating rental request:', error);
-      Alert.alert('Error', `Failed to ${action} rental request`);
+      showAlert('Error', `Failed to ${action} rental request`);
     }
   };
 
@@ -424,3 +425,5 @@ const styles = StyleSheet.create({
 });
 
 export default RentalRequestsScreen;
+
+

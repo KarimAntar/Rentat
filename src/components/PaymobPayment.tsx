@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
+import { showAlert } from '../contexts/ModalContext';
 // Note: To use WebView, install: npm install react-native-webview
 // For now, we'll open payment in external browser
 import { Ionicons } from '@expo/vector-icons';
@@ -78,7 +79,7 @@ const PaymobPayment: React.FC<PaymobPaymentProps> = ({
       // Note: In a real implementation, you'd need to handle the return from external browser
       // This could be done with deep linking or by checking payment status via API
     } catch (error) {
-      Alert.alert('Error', 'Could not open payment page');
+      showAlert('Error', 'Could not open payment page');
     }
   };
 

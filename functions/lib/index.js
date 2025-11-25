@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getWalletBalanceFunction = exports.resolveDisputeFunction = exports.createDispute = exports.confirmHandoverOwner = exports.confirmHandoverRenter = exports.markAllNotificationsRead = exports.requestPayout = exports.refreshPaymentKey = exports.confirmItemReturned = exports.confirmItemReceived = exports.onMessageCreated = exports.checkScheduledCampaigns = exports.onNotificationCampaignUpdated = exports.onNotificationCampaignCreated = exports.onRentalUpdated = exports.onRentalCreated = exports.completeRental = exports.processRentalResponse = exports.processRentalRequest = exports.webhooks = void 0;
+exports.getWalletBalanceFunction = exports.resolveDisputeFunction = exports.createDispute = exports.testFunction = exports.confirmHandoverRenter = exports.markAllNotificationsRead = exports.requestPayout = exports.refreshPaymentKey = exports.confirmItemReturned = exports.confirmItemReceived = exports.onMessageCreated = exports.checkScheduledCampaigns = exports.onNotificationCampaignUpdated = exports.onNotificationCampaignCreated = exports.onRentalUpdated = exports.onRentalCreated = exports.completeRental = exports.processRentalResponse = exports.processRentalRequest = exports.webhooks = exports.confirmHandoverOwner = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
@@ -59,7 +59,7 @@ const DIDIT_API_KEY = config_1.config.didit.apiKey;
 (0, config_1.initializeFirebaseAdmin)();
 // Set global options
 (0, v2_1.setGlobalOptions)({
-    region: 'us-central1',
+    region: 'europe-west1',
     maxInstances: 10,
 });
 // Initialize services
@@ -318,8 +318,46 @@ app.post('/paymob-webhook', express_1.default.json(), async (req, res) => {
         return res.json({ received: true });
     }
     catch (error) {
-        console.error('Error handling Paymob webhook:', error);
-        return res.status(500).send('Webhook handler failed');
+        console.error('Error confirming handover by renter:', error);
+        throw error instanceof https_1.HttpsError ? error : new https_1.HttpsError('internal', 'Failed to confirm handover');
+    }
+});
+exports.confirmHandoverOwner = (0, https_1.onCall)(async (request) => {
+    const { auth, data } = request;
+    if (!auth) {
+        throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+    const { rentalId } = data;
+    try {
+        const result = await (0, rentalFlow_1.confirmHandoverByOwner)(rentalId, auth.uid);
+        // Send notification to renter
+        const rentalDoc = await db.collection('rentals').doc(rentalId).get();
+        const rental = rentalDoc.data();
+        await sendNotification(rental.renterId, {
+            type: 'rental_update',
+            title: 'Handover Confirmed',
+            body: result.bothConfirmed
+                ? 'Both parties confirmed - rental is now active!'
+                : 'Owner confirmed handing over the item',
+            data: { rentalId, itemId: rental.itemId },
+        });
+        // Return success result
+        return {
+            success: true,
+            bothConfirmed: result.bothConfirmed,
+            message: result.bothConfirmed ? 'Both parties confirmed - rental is now active!' : 'Handover confirmed successfully',
+        };
+    }
+    catch (error) {
+        console.error('Error confirming handover by owner:', error);
+        // Return specific error information
+        return {
+            success: false,
+            bothConfirmed: false,
+            message: 'Failed to confirm handover',
+            error: error.message || 'Unknown error occurred',
+            code: error.code || 'unknown_error',
+        };
     }
 });
 // Didit KYC webhook endpoint
@@ -1784,52 +1822,98 @@ exports.confirmHandoverRenter = (0, https_1.onCall)(async (request) => {
                 : 'Renter confirmed receiving the item',
             data: { rentalId, itemId: rental.itemId },
         });
-        return result;
+        // Return success result
+        return {
+            success: true,
+            bothConfirmed: result.bothConfirmed,
+            message: result.bothConfirmed ? 'Both parties confirmed - rental is now active!' : 'Handover confirmed successfully',
+        };
     }
     catch (error) {
         console.error('Error confirming handover by renter:', error);
-        throw error instanceof https_1.HttpsError ? error : new https_1.HttpsError('internal', 'Failed to confirm handover');
+        // Convert regular JS errors to Firebase HttpsError to trigger error response
+        const errorMessage = error.message || 'Unknown error occurred';
+        throw new https_1.HttpsError('internal', `Failed to confirm handover: ${errorMessage}`, {
+            error: errorMessage,
+            code: 'internal_error',
+        });
     }
 });
-exports.confirmHandoverOwner = (0, https_1.onCall)(async (request) => {
+// Test function for debugging
+exports.testFunction = (0, https_1.onCall)(async (request) => {
     const { auth, data } = request;
-    if (!auth) {
-        throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
-    }
-    const { rentalId } = data;
-    try {
-        const result = await (0, rentalFlow_1.confirmHandoverByOwner)(rentalId, auth.uid);
-        // Send notification to renter
-        const rentalDoc = await db.collection('rentals').doc(rentalId).get();
-        const rental = rentalDoc.data();
-        await sendNotification(rental.renterId, {
-            type: 'rental_update',
-            title: 'Handover Confirmed',
-            body: result.bothConfirmed
-                ? 'Both parties confirmed - rental is now active!'
-                : 'Owner confirmed handing over the item',
-            data: { rentalId, itemId: rental.itemId },
-        });
-        return result;
-    }
-    catch (error) {
-        console.error('Error confirming handover by owner:', error);
-        throw error instanceof https_1.HttpsError ? error : new https_1.HttpsError('internal', 'Failed to confirm handover');
-    }
+    console.log('🧪 testFunction called with data:', data);
+    console.log('🧪 auth provided:', !!auth);
+    return {
+        success: true,
+        message: 'Test function executed successfully',
+        timestamp: new Date().toISOString(),
+        data: data
+    };
 });
 // Phase 4: Dispute management endpoints
 exports.createDispute = (0, https_1.onCall)(async (request) => {
-    const { auth, data } = request;
-    if (!auth) {
-        throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
-    }
-    const { rentalId, reason, evidence } = data;
+    console.log('🚀 createDispute Cloud Function STARTED');
+    console.log('🚀 Request received:', { hasAuth: !!request.auth, dataKeys: Object.keys(request.data || {}) });
     try {
-        return await (0, rentalFlow_1.raiseDispute)(rentalId, auth.uid, reason, evidence || []);
+        const { auth, data } = request;
+        if (!auth) {
+            console.log('❌ No authentication');
+            throw new https_1.HttpsError('unauthenticated', 'User must be authenticated');
+        }
+        console.log('✅ Authenticated user:', auth.uid);
+        const { rentalId, reason, evidence = [] } = data;
+        console.log('📋 Extracted data:', {
+            rentalId,
+            reasonLength: (reason === null || reason === void 0 ? void 0 : reason.length) || 0,
+            evidenceCount: evidence.length
+        });
+        // Basic validation
+        if (!rentalId) {
+            console.log('❌ Missing rentalId');
+            throw new https_1.HttpsError('invalid-argument', 'Rental ID is required');
+        }
+        if (!reason || reason.trim() === '') {
+            console.log('❌ Missing or empty reason');
+            throw new https_1.HttpsError('invalid-argument', 'Reason is required');
+        }
+        console.log('✅ Basic validation passed, about to check rental existence...');
+        // Check if rental exists first
+        const rentalRef = db.collection('rentals').doc(rentalId);
+        const rentalDoc = await rentalRef.get();
+        if (!rentalDoc.exists) {
+            console.log('❌ Rental does not exist:', rentalId);
+            throw new https_1.HttpsError('not-found', `Rental ${rentalId} not found`);
+        }
+        const rental = rentalDoc.data();
+        console.log('✅ Rental exists:', {
+            rentalId,
+            status: rental.status,
+            ownerId: rental.ownerId,
+            renterId: rental.renterId,
+            userId: auth.uid
+        });
+        console.log('🏃 About to call raiseDispute service function...');
+        const result = await (0, rentalFlow_1.raiseDispute)(rentalId, auth.uid, reason, evidence);
+        console.log('✅ raiseDispute service returned successfully:', result);
+        return result;
     }
     catch (error) {
-        console.error('Error raising dispute:', error);
-        throw error instanceof https_1.HttpsError ? error : new https_1.HttpsError('internal', 'Failed to raise dispute');
+        console.error('❌ Error in createDispute Cloud Function:', error);
+        console.error('❌ Error details:', {
+            name: error.name,
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
+        // If it's already an HttpsError, re-throw as-is
+        if (error instanceof https_1.HttpsError) {
+            console.log('❌ Rethrowing HttpsError:', error.code, error.message);
+            throw error;
+        }
+        // For any other error, wrap it
+        console.log('❌ Wrapping error as internal error');
+        throw new https_1.HttpsError('internal', `Dispute creation failed: ${error.message || 'Unknown error'}`);
     }
 });
 exports.resolveDisputeFunction = (0, https_1.onCall)(async (request) => {
@@ -1872,7 +1956,7 @@ exports.getWalletBalanceFunction = (0, https_1.onCall)(async (request) => {
     }
     catch (error) {
         console.error('Error getting wallet balance:', error);
-        throw new https_1.HttpsError('internal', 'Failed to get wallet balance');
+        throw error instanceof https_1.HttpsError ? error : new https_1.HttpsError('internal', 'Failed to get wallet balance');
     }
 });
 //# sourceMappingURL=index.js.map

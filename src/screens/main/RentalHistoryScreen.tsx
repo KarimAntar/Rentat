@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -49,7 +50,7 @@ const RentalHistoryScreen: React.FC = () => {
       setRentals(rentalData);
     } catch (error) {
       console.error('Error loading rental history:', error);
-      Alert.alert('Error', 'Failed to load rental history');
+      showAlert('Error', 'Failed to load rental history');
     } finally {
       setLoading(false);
     }
@@ -181,7 +182,7 @@ const RentalHistoryScreen: React.FC = () => {
                     Item
                   </Text>
                   <Text style={styles.roleText}>
-                    {getRoleText(rental)} • {getOtherPartyName(rental)}
+                    {getRoleText(rental)} â€¢ {getOtherPartyName(rental)}
                   </Text>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(rental.status) }]}>
@@ -394,3 +395,5 @@ const styles = StyleSheet.create({
 });
 
 export default RentalHistoryScreen;
+
+

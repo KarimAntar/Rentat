@@ -28,6 +28,7 @@ export declare function confirmHandoverByOwner(rentalId: string, userId: string)
 export declare function raiseDispute(rentalId: string, userId: string, reason: string, evidence: string[]): Promise<{
     success: boolean;
     disputeId: string;
+    message: string;
 }>;
 /**
  * Phase 4: Dispute Management
@@ -39,6 +40,7 @@ export declare function resolveDispute(rentalId: string, moderatorId: string, de
 /**
  * Phase 5: Wallet & Payouts
  * Get wallet balance with proper separation of Available vs Pending/Locked funds
+ * Only includes POSITIVE amounts (credits/income) - excludes negative amounts (expenses/payments)
  */
 export declare function getWalletBalance(userId: string): Promise<{
     available: number;

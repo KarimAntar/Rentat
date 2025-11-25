@@ -61,15 +61,51 @@ export const raiseDispute = async (
   params: RaiseDisputeParams
 ): Promise<RaiseDisputeResult> => {
   try {
+    console.log('🔄 raiseDispute called with params:', params);
+    console.log('🔄 params.rentalId:', params.rentalId);
+    console.log('🔄 params.reason:', params.reason);
+    console.log('🔄 params.evidence:', params.evidence);
+
+    if (!params.rentalId) {
+      throw new Error('Missing rentalId');
+    }
+    if (!params.reason || params.reason.trim() === '') {
+      throw new Error('Missing or empty reason');
+    }
+
     const createDispute = httpsCallable<
       RaiseDisputeParams,
       RaiseDisputeResult
     >(functions, 'createDispute');
 
+    console.log('🔄 About to call createDispute Cloud Function...');
+    console.log('🔄 Sending to Cloud Function:', {
+      rentalId: params.rentalId,
+      reason: params.reason,
+      evidenceCount: params.evidence.length,
+      evidence: params.evidence
+    });
+
     const result = await createDispute(params);
+    console.log('✅ Cloud Function returned result:', result);
+    console.log('✅ Result data:', result.data);
+
     return result.data;
-  } catch (error) {
-    console.error('Error raising dispute:', error);
+  } catch (error: any) {
+    console.error('❌ Error raising dispute:', error);
+    console.error('❌ Error details:', {
+      message: error?.message,
+      code: error?.code,
+      details: error?.details,
+      stack: error?.stack
+    });
+
+    // If it's Firebase error, log more details
+    if (error.code === 'functions/internal') {
+      console.error('🚨 This is a Firebase internal error - check Cloud Function logs');
+      console.error('🚨 Error originated from Cloud Function - likely a server-side issue');
+    }
+
     throw error;
   }
 };

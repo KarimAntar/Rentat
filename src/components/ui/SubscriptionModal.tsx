@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -46,7 +47,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       setTiers(subscriptionTiers);
     } catch (error) {
       console.error('Error loading subscription tiers:', error);
-      Alert.alert('Error', 'Failed to load subscription options');
+      showAlert('Error', 'Failed to load subscription options');
     }
   };
 
@@ -78,7 +79,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
     // Check if this is the current plan
     if (currentSubscription && currentSubscription.tierId === selectedTier.id) {
-      Alert.alert('Already Subscribed', 'You are already subscribed to this plan.');
+      showAlert('Already Subscribed', 'You are already subscribed to this plan.');
       return;
     }
 
@@ -86,7 +87,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     try {
       if (currentSubscription) {
         // Change existing subscription
-        Alert.alert(
+        showAlert(
           'Change Subscription',
           `Are you sure you want to ${selectedTier.price > (subscriptionService.getSubscriptionTier(currentSubscription.tierId)?.price || 0) ? 'upgrade' : 'downgrade'} to ${selectedTier.name}?`,
           [
@@ -100,7 +101,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     selectedTier.id
                   );
 
-                  Alert.alert(
+                  showAlert(
                     'Subscription Updated!',
                     `Your subscription has been changed to ${selectedTier.name}.`,
                     [{ text: 'OK', onPress: () => {
@@ -109,7 +110,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     }}]
                   );
                 } catch (error: any) {
-                  Alert.alert('Error', error.message || 'Failed to change subscription');
+                  showAlert('Error', error.message || 'Failed to change subscription');
                 }
               },
             },
@@ -119,7 +120,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         // New subscription
         const amount = billingCycle === 'yearly' ? (selectedTier.yearlyPrice || selectedTier.price * 12) : selectedTier.price;
 
-        Alert.alert(
+        showAlert(
           'Subscribe to Plan',
           `Subscribe to ${selectedTier.name} for ${billingCycle === 'yearly' ? 'yearly' : 'monthly'}? ${selectedTier.trialDays ? `Includes ${selectedTier.trialDays} day free trial.` : ''}`,
           [
@@ -138,7 +139,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     paymentMethodId
                   );
 
-                  Alert.alert(
+                  showAlert(
                     'Subscription Successful!',
                     `Welcome to ${selectedTier.name}! ${selectedTier.trialDays ? `Your ${selectedTier.trialDays} day free trial has started.` : 'Your subscription is now active.'}`,
                     [{ text: 'OK', onPress: () => {
@@ -147,7 +148,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     }}]
                   );
                 } catch (error: any) {
-                  Alert.alert('Error', error.message || 'Failed to subscribe');
+                  showAlert('Error', error.message || 'Failed to subscribe');
                 }
               },
             },
@@ -155,7 +156,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
         );
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to process subscription');
+      showAlert('Error', error.message || 'Failed to process subscription');
     } finally {
       setLoading(false);
     }
@@ -164,7 +165,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const handleCancelSubscription = async () => {
     if (!currentSubscription || !user) return;
 
-    Alert.alert(
+    showAlert(
       'Cancel Subscription',
       'Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your current billing period.',
       [
@@ -177,13 +178,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               setLoading(true);
               await subscriptionService.cancelSubscription(user.uid, 'User requested cancellation');
 
-              Alert.alert(
+              showAlert(
                 'Subscription Cancelled',
                 'Your subscription has been cancelled. You will retain access to premium features until the end of your current billing period.',
                 [{ text: 'OK', onPress: onClose }]
               );
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to cancel subscription');
+              showAlert('Error', error.message || 'Failed to cancel subscription');
             } finally {
               setLoading(false);
             }
@@ -221,7 +222,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
               {currentSubscription ? 'Manage Subscription' : 'Choose Your Plan'}
             </Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Text style={styles.closeText}>✕</Text>
+              <Text style={styles.closeText}>âœ•</Text>
             </TouchableOpacity>
           </View>
 
@@ -424,3 +425,5 @@ const styles = StyleSheet.create({
 });
 
 export default SubscriptionModal;
+
+

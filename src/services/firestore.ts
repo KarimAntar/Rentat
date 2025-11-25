@@ -330,18 +330,23 @@ export class RentalService extends FirestoreService {
       orderBy('createdAt', 'desc')
     ]);
 
-    // Fetch item details for display
+    // Fetch item and user details for display
     const rentalsWithDetails = await Promise.all(
       rentals.map(async (rental) => {
         try {
           const item = await ItemService.getItem(rental.itemId);
+          // Fetch the other party (renter if viewing as owner, owner if viewing as renter)
+          const otherPartyId = asOwner ? rental.renterId : rental.ownerId;
+          const otherParty = await UserService.getUser(otherPartyId);
+
           return {
             ...rental,
             itemTitle: item?.title,
             itemImage: item?.images?.[0],
+            otherPartyName: otherParty?.displayName,
           } as any;
         } catch (error) {
-          console.error('Error fetching item details for rental:', rental.id, error);
+          console.error('Error fetching details for rental:', rental.id, error);
           return rental as any;
         }
       })

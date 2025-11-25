@@ -1,3 +1,4 @@
+﻿import { showAlert } from '../../contexts/ModalContext';
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -79,12 +80,12 @@ const EditItemScreen: React.FC = (props: any) => {
       setLoading(true);
       const existing = await ItemService.getItem(itemId);
       if (!existing) {
-        Alert.alert('Error', 'Item not found');
+        showAlert('Error', 'Item not found');
         navigation.goBack();
         return;
       }
       if (existing.ownerId !== user?.uid) {
-        Alert.alert('Unauthorized', 'You cannot edit this item');
+        showAlert('Unauthorized', 'You cannot edit this item');
         navigation.goBack();
         return;
       }
@@ -111,7 +112,7 @@ const EditItemScreen: React.FC = (props: any) => {
         },
       });
     } catch (e) {
-      Alert.alert('Error', 'Failed to load item');
+      showAlert('Error', 'Failed to load item');
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -136,7 +137,7 @@ const EditItemScreen: React.FC = (props: any) => {
         updateField('images', [...form.images, ...newUris].slice(0, 8 - form.existingImages.length));
       }
     } catch {
-      Alert.alert('Error', 'Could not pick images');
+      showAlert('Error', 'Could not pick images');
     }
   };
 
@@ -152,7 +153,7 @@ const EditItemScreen: React.FC = (props: any) => {
         updateField('images', [...form.images, result.assets[0].uri].slice(0, 8 - form.existingImages.length));
       }
     } catch {
-      Alert.alert('Error', 'Could not take photo');
+      showAlert('Error', 'Could not take photo');
     }
   };
 
@@ -237,7 +238,7 @@ const EditItemScreen: React.FC = (props: any) => {
       navigation.navigate('ItemDetails', { itemId: item.id });
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to save changes');
+      showAlert('Error', 'Failed to save changes');
     } finally {
       setSaving(false);
     }
@@ -543,3 +544,5 @@ const styles = StyleSheet.create({
 });
 
 export default EditItemScreen;
+
+

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Image,
   Platform,
 } from 'react-native';
@@ -16,6 +15,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Button from '../../components/ui/Button';
 import { verificationService } from '../../services/verification';
 import { useAuthContext } from '../../contexts/AuthContext';
+import { showAlert } from '../../contexts/ModalContext';
 
 interface VerificationScreenProps {
   route: {
@@ -61,7 +61,7 @@ const VerificationScreen: React.FC = () => {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
+        showAlert(
           'Permission Required',
           'Camera and photo library permissions are required to upload verification documents.',
           [{ text: 'OK' }]
@@ -103,7 +103,7 @@ const VerificationScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to capture image. Please try again.');
+      showAlert('Error', 'Failed to capture image. Please try again.');
     }
   };
 
@@ -127,7 +127,7 @@ const VerificationScreen: React.FC = () => {
 
       await verificationService.submitVerification(user.uid, submission);
 
-      Alert.alert(
+      showAlert(
         'Verification Submitted!',
         'Your verification documents have been submitted for review. You will be notified once the verification process is complete.',
         [
@@ -140,7 +140,7 @@ const VerificationScreen: React.FC = () => {
 
     } catch (error) {
       console.error('Error submitting verification:', error);
-      Alert.alert('Error', 'Failed to submit verification. Please try again.');
+      showAlert('Error', 'Failed to submit verification. Please try again.');
     } finally {
       setSubmitting(false);
     }

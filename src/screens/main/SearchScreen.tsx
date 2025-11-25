@@ -37,6 +37,7 @@ import { favoritesService } from '../../services/favorites';
 import { locationService } from '../../services/location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TabHeader from '../../components/TabHeader';
+import { showAlert } from '../../contexts/ModalContext';
 
 
 
@@ -164,7 +165,7 @@ const SearchScreen: React.FC = () => {
 
   const toggleFavorite = async (itemId: string) => {
     if (!user) {
-      Alert.alert('Login Required', 'Please log in to save favorites');
+      showAlert('Login Required', 'Please log in to save favorites');
       return;
     }
 
@@ -181,7 +182,7 @@ const SearchScreen: React.FC = () => {
       setFavorites(newFavorites);
     } catch (error) {
       console.error('Error toggling favorite:', error);
-      Alert.alert('Error', 'Failed to update favorites');
+      showAlert('Error', 'Failed to update favorites');
     }
   };
 
@@ -227,7 +228,7 @@ const SearchScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error performing search:', error);
-      Alert.alert('Error', 'Failed to perform search');
+      showAlert('Error', 'Failed to perform search');
     } finally {
       setLoading(false);
     }
@@ -438,11 +439,11 @@ const SearchScreen: React.FC = () => {
             longitude: location.longitude,
             radius: 10, // Default 10km radius
           });
-          Alert.alert('Success', 'Location set to your current location');
+          showAlert('Success', 'Location set to your current location');
         }
       } catch (error) {
         console.error('Error getting location:', error);
-        Alert.alert('Error', 'Failed to get your location. Please check your location permissions.');
+        showAlert('Error', 'Failed to get your location. Please check your location permissions.');
       }
     };
 
@@ -955,11 +956,11 @@ const SearchScreen: React.FC = () => {
                     }));
                     performSearch();
                   } else {
-                    Alert.alert('Location unavailable', 'Could not obtain your location.');
+                    showAlert('Location unavailable', 'Could not obtain your location.');
                   }
                 } catch (err) {
                   console.error('Error getting location for Nearby quick filter:', err);
-                  Alert.alert('Error', 'Failed to get your location.');
+                  showAlert('Error', 'Failed to get your location.');
                 }
               }}
             >

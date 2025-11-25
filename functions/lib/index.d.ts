@@ -1,3 +1,16 @@
+export declare const confirmHandoverOwner: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    bothConfirmed: boolean;
+    message: string;
+    error?: undefined;
+    code?: undefined;
+} | {
+    success: boolean;
+    bothConfirmed: boolean;
+    message: string;
+    error: any;
+    code: any;
+}>, unknown>;
 export declare const webhooks: import("firebase-functions/v2/https").HttpsFunction;
 export declare const processRentalRequest: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     rentalId: string;
@@ -61,14 +74,18 @@ export declare const markAllNotificationsRead: import("firebase-functions/v2/htt
 export declare const confirmHandoverRenter: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     success: boolean;
     bothConfirmed: boolean;
+    message: string;
 }>, unknown>;
-export declare const confirmHandoverOwner: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+export declare const testFunction: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     success: boolean;
-    bothConfirmed: boolean;
+    message: string;
+    timestamp: string;
+    data: any;
 }>, unknown>;
 export declare const createDispute: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     success: boolean;
     disputeId: string;
+    message: string;
 }>, unknown>;
 export declare const resolveDisputeFunction: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     success: boolean;
