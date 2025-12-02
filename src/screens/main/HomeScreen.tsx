@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { ActiveOrdersSection } from '../../components/dashboard/ActiveOrdersSection';
 
 type RootStackParamList = {
   ItemDetails: { itemId: string };
@@ -123,6 +124,9 @@ const HomeScreen: React.FC = () => {
             </Text>
           </View>
         </View>
+
+        {/* Active Orders Section */}
+        <ActiveOrdersSection />
 
         {/* Quick Actions Grid */}
         <View style={styles.quickActions}>

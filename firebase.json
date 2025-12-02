@@ -51,5 +51,8 @@
       "DIDIT_WEBHOOK_URL": "https://webhooks-tfsivlyrrq-uc.a.run.app/didit-webhook",
       "VAPID_PRIVATE_KEY": "Y_0M5d_fqo4DQHhTejig4rPwZhrGQA8HHsGuu5tsRgA"
     }
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

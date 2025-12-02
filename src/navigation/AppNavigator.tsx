@@ -495,6 +495,27 @@ const AppNavigator: React.FC = () => {
           options={{ headerShown: false }}
         />
         <RootStack.Screen
+          name="OrderDetails"
+          component={require('../screens/main/OrderDetailsScreen').default}
+          options={{
+            headerShown: true,
+            title: 'Order Details',
+            headerStyle: {
+              backgroundColor: '#FFFFFF',
+              elevation: 4,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+            },
+            headerTintColor: '#111827',
+            headerTitleStyle: {
+              fontWeight: '600',
+              fontSize: 18,
+            },
+          }}
+        />
+        <RootStack.Screen
           name="Messages"
           component={require('../screens/main/MessagesScreen').default}
           options={({ navigation }) => ({
@@ -560,11 +581,6 @@ const AppNavigator: React.FC = () => {
               fontSize: 18,
             },
           }}
-        />
-        <RootStack.Screen
-          name="OrderDetails"
-          component={require('../screens/main/OrderDetailsScreen').default}
-          options={{ headerShown: false }}
         />
       </RootStack.Navigator>
 

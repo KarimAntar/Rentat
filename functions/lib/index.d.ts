@@ -76,11 +76,11 @@ export declare const confirmHandoverRenter: import("firebase-functions/v2/https"
     bothConfirmed: boolean;
     message: string;
 }>, unknown>;
-export declare const testFunction: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+export declare const testFunction: import("firebase-functions/v2/https").CallableFunction<any, Promise<"OK" | {
     success: boolean;
     message: string;
-    timestamp: string;
-    data: any;
+    timestamp: number;
+    inputLength: number;
 }>, unknown>;
 export declare const createDispute: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
     success: boolean;
@@ -96,4 +96,16 @@ export declare const getWalletBalanceFunction: import("firebase-functions/v2/htt
     locked: number;
     total: number;
     currency: string;
+}>, unknown>;
+export declare const releaseDeposit: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    message: string;
+}>, unknown>;
+export declare const releasePartialDeposit: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    message: string;
+}>, unknown>;
+export declare const holdDepositFunctionExport: import("firebase-functions/v2/https").CallableFunction<any, Promise<{
+    success: boolean;
+    message: string;
 }>, unknown>;

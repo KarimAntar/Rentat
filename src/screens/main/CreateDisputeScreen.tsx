@@ -18,6 +18,8 @@ import { showAlert } from '../../contexts/ModalContext';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { raiseDispute } from '../../services/disputes';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../config/firebase';
 
 export const CreateDisputeScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -45,9 +47,6 @@ export const CreateDisputeScreen: React.FC = () => {
   // 🔍 Debug function - TEST
   const testCloudFunction = async () => {
     console.log('🧪 Testing Cloud Function connection...');
-
-    const { httpsCallable } = require('firebase/functions');
-    const { functions } = require('../config/firebase');
 
     try {
       const testFunc = httpsCallable(functions, 'testFunction');

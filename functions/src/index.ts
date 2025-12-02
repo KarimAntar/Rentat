@@ -14,6 +14,11 @@ import {
   resolveDispute,
   getWalletBalance,
 } from './services/rentalFlow';
+import {
+  releaseDepositFunction,
+  releasePartialDepositFunction,
+  holdDepositFunction,
+} from './services/depositManagement';
 
 const paymob = PaymobFunctionsService.initialize({
   apiKey: config.paymob.apiKey,
@@ -2024,7 +2029,7 @@ async function completeRentalTransaction(rentalId: string, rental: any) {
       sendNotification(rental.ownerId, {
         type: 'rental_completed',
         title: 'Rental Completed',
-        body: `You've earned $${ownerPayout} from your rental`,
+        body: `You've earned ${rental.pricing.currency} ${ownerPayout.toFixed(2)} (credited to your wallet)`,
         data: { rentalId },
       }),
       sendNotification(rental.renterId, {
@@ -2085,19 +2090,28 @@ export const confirmHandoverRenter = onCall(async (request) => {
   }
 });
 
-// Test function for debugging
-export const testFunction = onCall(async (request) => {
-  const { auth, data } = request;
+// Test function for debugging NO AUTH/SERVICES
+export const testFunction = onCall(async (request: any) => {
+  console.log('🧪 testFunction invoked');
+  return 'OK';
+  try {
+    console.log('🧪 Request data keys:', Object.keys(request.data || {}));
+    console.log('🧪 Auth exists:', !!request.auth);
 
-  console.log('🧪 testFunction called with data:', data);
-  console.log('🧪 auth provided:', !!auth);
+    // Test basic operations
+    const testId = 'test_' + Date.now();
+    console.log('🧪 Generated test ID:', testId);
 
-  return {
-    success: true,
-    message: 'Test function executed successfully',
-    timestamp: new Date().toISOString(),
-    data: data
-  };
+    return {
+      success: true,
+      message: 'Test function works!',
+      timestamp: Date.now(),
+      inputLength: Object.keys(request.data || {}).length
+    };
+  } catch (error) {
+    console.error('🧪 testFunction ERROR:', error);
+    throw error;
+  }
 });
 
 // Phase 4: Dispute management endpoints
@@ -2238,3 +2252,8 @@ export const getWalletBalanceFunction = onCall(async (request) => {
     throw error instanceof HttpsError ? error : new HttpsError('internal', 'Failed to get wallet balance');
   }
 });
+
+// Phase 6: Deposit Management - Export Firebase Functions
+export const releaseDeposit = releaseDepositFunction;
+export const releasePartialDeposit = releasePartialDepositFunction;
+export const holdDepositFunctionExport = holdDepositFunction;

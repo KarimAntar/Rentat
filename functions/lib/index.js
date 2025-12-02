@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getWalletBalanceFunction = exports.resolveDisputeFunction = exports.createDispute = exports.testFunction = exports.confirmHandoverRenter = exports.markAllNotificationsRead = exports.requestPayout = exports.refreshPaymentKey = exports.confirmItemReturned = exports.confirmItemReceived = exports.onMessageCreated = exports.checkScheduledCampaigns = exports.onNotificationCampaignUpdated = exports.onNotificationCampaignCreated = exports.onRentalUpdated = exports.onRentalCreated = exports.completeRental = exports.processRentalResponse = exports.processRentalRequest = exports.webhooks = exports.confirmHandoverOwner = void 0;
+exports.holdDepositFunctionExport = exports.releasePartialDeposit = exports.releaseDeposit = exports.getWalletBalanceFunction = exports.resolveDisputeFunction = exports.createDispute = exports.testFunction = exports.confirmHandoverRenter = exports.markAllNotificationsRead = exports.requestPayout = exports.refreshPaymentKey = exports.confirmItemReturned = exports.confirmItemReceived = exports.onMessageCreated = exports.checkScheduledCampaigns = exports.onNotificationCampaignUpdated = exports.onNotificationCampaignCreated = exports.onRentalUpdated = exports.onRentalCreated = exports.completeRental = exports.processRentalResponse = exports.processRentalRequest = exports.webhooks = exports.confirmHandoverOwner = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
@@ -47,6 +47,7 @@ const config_1 = require("./config");
 const diditKyc_1 = require("./services/diditKyc");
 const paymob_1 = __importDefault(require("./services/paymob"));
 const rentalFlow_1 = require("./services/rentalFlow");
+const depositManagement_1 = require("./services/depositManagement");
 const paymob = paymob_1.default.initialize({
     apiKey: config_1.config.paymob.apiKey,
     integrationId: config_1.config.paymob.integrationId,
@@ -1786,7 +1787,7 @@ async function completeRentalTransaction(rentalId, rental) {
             sendNotification(rental.ownerId, {
                 type: 'rental_completed',
                 title: 'Rental Completed',
-                body: `You've earned $${ownerPayout} from your rental`,
+                body: `You've earned ${rental.pricing.currency} ${ownerPayout.toFixed(2)} (credited to your wallet)`,
                 data: { rentalId },
             }),
             sendNotification(rental.renterId, {
@@ -1839,17 +1840,27 @@ exports.confirmHandoverRenter = (0, https_1.onCall)(async (request) => {
         });
     }
 });
-// Test function for debugging
+// Test function for debugging NO AUTH/SERVICES
 exports.testFunction = (0, https_1.onCall)(async (request) => {
-    const { auth, data } = request;
-    console.log('🧪 testFunction called with data:', data);
-    console.log('🧪 auth provided:', !!auth);
-    return {
-        success: true,
-        message: 'Test function executed successfully',
-        timestamp: new Date().toISOString(),
-        data: data
-    };
+    console.log('🧪 testFunction invoked');
+    return 'OK';
+    try {
+        console.log('🧪 Request data keys:', Object.keys(request.data || {}));
+        console.log('🧪 Auth exists:', !!request.auth);
+        // Test basic operations
+        const testId = 'test_' + Date.now();
+        console.log('🧪 Generated test ID:', testId);
+        return {
+            success: true,
+            message: 'Test function works!',
+            timestamp: Date.now(),
+            inputLength: Object.keys(request.data || {}).length
+        };
+    }
+    catch (error) {
+        console.error('🧪 testFunction ERROR:', error);
+        throw error;
+    }
 });
 // Phase 4: Dispute management endpoints
 exports.createDispute = (0, https_1.onCall)(async (request) => {
@@ -1959,4 +1970,8 @@ exports.getWalletBalanceFunction = (0, https_1.onCall)(async (request) => {
         throw error instanceof https_1.HttpsError ? error : new https_1.HttpsError('internal', 'Failed to get wallet balance');
     }
 });
+// Phase 6: Deposit Management - Export Firebase Functions
+exports.releaseDeposit = depositManagement_1.releaseDepositFunction;
+exports.releasePartialDeposit = depositManagement_1.releasePartialDepositFunction;
+exports.holdDepositFunctionExport = depositManagement_1.holdDepositFunction;
 //# sourceMappingURL=index.js.map

@@ -237,6 +237,23 @@ service cloud.firestore {
       allow delete: if isAuthenticated() &&
         (isOwner(resource.data.userId) || isAdmin());
     }
+
+    // Dashboard notifications collection (new)
+    match /dashboard_notifications/{notificationId} {
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      allow create: if isAdmin(); // Only system/admin creates these
+      allow update: if isAuthenticated() && isOwner(resource.data.userId) && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // Deposits collection
+    match /deposits/{depositId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(request.resource.data.userId);
+      allow update: if isAdmin(); // Only admins can update deposits (hold, release)
+      allow delete: if isAdmin();
+    }
     
     // Categories collection (reference data)
     match /categories/{categoryId} {
@@ -492,75 +509,6 @@ service cloud.firestore {
     match /public/{allPaths=**} {
       allow read: if true;
       allow write: if isAdmin();
-    }
-  }
-}
-
-// Cloud Storage Security Rules
-service firebase.storage {
-  match /b/{bucket}/o {
-    
-    // User profile pictures and verification documents
-    match /users/{userId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        request.auth.uid == userId &&
-        // Limit file size to 10MB
-        request.resource.size < 10 * 1024 * 1024 &&
-        // Only allow image files
-        request.resource.contentType.matches('image/.*');
-    }
-    
-    // Item images
-    match /items/{itemId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        // Verify user owns the item
-        exists(/databases/$(database)/documents/items/$(itemId)) &&
-        get(/databases/$(database)/documents/items/$(itemId)).data.ownerId == request.auth.uid &&
-        // Limit file size to 10MB
-        request.resource.size < 10 * 1024 * 1024 &&
-        // Only allow image files
-        request.resource.contentType.matches('image/.*');
-    }
-    
-    // Chat images
-    match /chats/{chatId}/{fileName} {
-      allow read: if request.auth != null &&
-        exists(/databases/$(database)/documents/chats/$(chatId)) &&
-        request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-      
-      allow write: if request.auth != null &&
-        exists(/databases/$(database)/documents/chats/$(chatId)) &&
-        request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
-        // Limit file size to 10MB
-        request.resource.size < 10 * 1024 * 1024 &&
-        // Only allow image files
-        request.resource.contentType.matches('image/.*');
-    }
-    
-    // Review images
-    match /reviews/{reviewId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        exists(/databases/$(database)/documents/reviews/$(reviewId)) &&
-        get(/databases/$(database)/documents/reviews/$(reviewId)).data.reviewerId == request.auth.uid &&
-        // Limit file size to 10MB
-        request.resource.size < 10 * 1024 * 1024 &&
-        // Only allow image files
-        request.resource.contentType.matches('image/.*');
-    }
-    
-    // Public assets (category icons, app assets)
-    match /public/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-    
-    // Deny all other access
-    match /{allPaths=**} {
-      allow read, write: if false;
     }
   }
 }
