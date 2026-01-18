@@ -162,7 +162,7 @@ const EditProfileScreen: React.FC = () => {
           // Remove image
           if (user.photoURL) {
             try {
-              await StorageService.deleteImage(`users/${user.uid}/profile.jpg`);
+              await StorageService.deleteImage(user.photoURL);
             } catch (error) {
               console.log('Failed to delete old profile image:', error);
             }

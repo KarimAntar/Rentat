@@ -1,7 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, initializeFirestore, connectFirestoreEmulator, Firestore } from 'firebase/firestore';
-import { getStorage, connectStorageEmulator, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator, Functions } from 'firebase/functions';
 import Constants from 'expo-constants';
 
@@ -70,11 +69,8 @@ try {
   db = getFirestore(app);
 }
 
-// Initialize Storage
-const storage: FirebaseStorage = getStorage(app);
-
 // Initialize Functions
-const functions: Functions = getFunctions(app);
+const functions: Functions = getFunctions(app, 'europe-west1');
 
 // Connect to emulators in development
 if (__DEV__ && Constants.expoConfig?.extra?.useEmulators) {
@@ -92,13 +88,6 @@ if (__DEV__ && Constants.expoConfig?.extra?.useEmulators) {
     console.log('Auth emulator should be configured in app.json/app.config.js');
   } catch (error) {
     console.log('Auth emulator connection error:', error);
-  }
-
-  try {
-    // Connect to Storage emulator
-    connectStorageEmulator(storage, emulatorHost, 9199);
-  } catch (error) {
-    console.log('Storage emulator already connected');
   }
 
   try {
@@ -124,7 +113,7 @@ export const collections = {
 } as const;
 
 // Export Firebase services
-export { app, auth, db, storage, functions };
+export { app, auth, db, functions };
 
 // Firebase configuration constants
 export const FIREBASE_CONFIG = {

@@ -38,6 +38,13 @@ EXPO_PUBLIC_PAYMOB_IFRAME_ID=your_iframe_id
 EXPO_PUBLIC_PAYMOB_HMAC_SECRET=your_hmac_secret
 ```
 
+### Vercel Blob Storage Configuration
+```
+EXPO_PUBLIC_BLOB_READ_WRITE_TOKEN=vercel_blob_rw_your_token
+```
+
+**Important:** This token provides full read/write access to your Vercel Blob storage. Keep it secure and never commit it to version control. See `docs/VERCEL_BLOB_SETUP.md` for detailed setup instructions.
+
 ## Server-Side Environment Variables (Firebase Functions)
 
 These variables should be set using Firebase Functions configuration or Cloud Function environment variables:

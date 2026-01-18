@@ -7,10 +7,13 @@ import {
   serverTimestamp,
   runTransaction
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage, collections } from '../config/firebase';
+import { put, del } from '@vercel/blob';
+import { db, collections } from '../config/firebase';
 import { User, UserVerification } from '../types';
 import { authService } from './auth';
+
+// Get Vercel Blob token from environment or config
+const BLOB_READ_WRITE_TOKEN = process.env.EXPO_PUBLIC_BLOB_READ_WRITE_TOKEN || '';
 
 export interface VerificationDocument {
   id: string;
@@ -106,7 +109,7 @@ export class VerificationService {
     }
   }
 
-  // Upload verification image to storage
+  // Upload verification image to Vercel Blob
   private async uploadVerificationImage(
     userId: string,
     type: 'front' | 'back' | 'selfie',
@@ -118,13 +121,14 @@ export class VerificationService {
       
       // Create unique filename
       const filename = `verification/${userId}/${type}_${Date.now()}.jpg`;
-      const imageRef = ref(storage, filename);
 
-      // Upload image
-      const snapshot = await uploadBytes(imageRef, blob);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      // Upload to Vercel Blob
+      const result = await put(filename, blob, {
+        access: 'public',
+        token: BLOB_READ_WRITE_TOKEN,
+      });
 
-      return downloadURL;
+      return result.url;
     } catch (error) {
       console.error('Error uploading verification image:', error);
       throw new Error('Failed to upload verification image');
@@ -334,15 +338,16 @@ export class VerificationService {
   }
 
   // Delete verification images (for privacy/cleanup)
-  public async deleteVerificationImages(userId: string): Promise<void> {
+  public async deleteVerificationImages(imageUrls: string[]): Promise<void> {
     try {
-      const folderRef = ref(storage, `verification/${userId}/`);
+      // Delete each image URL from Vercel Blob
+      const deletePromises = imageUrls.map(url => 
+        del(url, { token: BLOB_READ_WRITE_TOKEN })
+      );
       
-      // Note: Firebase Storage doesn't have a direct way to delete folders
-      // In a real implementation, you'd need to list all files and delete them individually
-      // or use Cloud Functions with Firebase Admin SDK
+      await Promise.all(deletePromises);
       
-      console.log('Verification images cleanup initiated for user:', userId);
+      console.log('Verification images deleted successfully');
     } catch (error) {
       console.error('Error deleting verification images:', error);
       throw new Error('Failed to delete verification images');

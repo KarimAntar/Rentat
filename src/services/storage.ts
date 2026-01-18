@@ -1,14 +1,16 @@
-import { storage } from '../config/firebase';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { put, del } from '@vercel/blob';
 
 export interface ImageUploadResult {
   url: string;
   path: string;
 }
 
+// Get Vercel Blob token from environment or config
+const BLOB_READ_WRITE_TOKEN = process.env.EXPO_PUBLIC_BLOB_READ_WRITE_TOKEN || '';
+
 export class StorageService {
   /**
-   * Upload an image to Firebase Storage
+   * Upload an image to Vercel Blob
    */
   static async uploadImage(
     uri: string,
@@ -20,22 +22,22 @@ export class StorageService {
       const timestamp = Date.now();
       const finalFileName = fileName || `image_${timestamp}.jpg`;
       
-      // Create storage reference
-      const imageRef = ref(storage, `${folder}/${finalFileName}`);
+      // Create the full path
+      const path = `${folder}/${finalFileName}`;
       
       // Convert URI to blob
       const response = await fetch(uri);
       const blob = await response.blob();
       
-      // Upload image
-      const snapshot = await uploadBytes(imageRef, blob);
-      
-      // Get download URL
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      // Upload to Vercel Blob
+      const result = await put(path, blob, {
+        access: 'public',
+        token: BLOB_READ_WRITE_TOKEN,
+      });
       
       return {
-        url: downloadURL,
-        path: snapshot.ref.fullPath,
+        url: result.url,
+        path: result.pathname,
       };
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -63,12 +65,13 @@ export class StorageService {
   }
 
   /**
-   * Delete an image from Firebase Storage
+   * Delete an image from Vercel Blob
    */
-  static async deleteImage(imagePath: string): Promise<void> {
+  static async deleteImage(imageUrl: string): Promise<void> {
     try {
-      const imageRef = ref(storage, imagePath);
-      await deleteObject(imageRef);
+      await del(imageUrl, {
+        token: BLOB_READ_WRITE_TOKEN,
+      });
     } catch (error) {
       console.error('Error deleting image:', error);
       throw new Error('Failed to delete image');
@@ -78,9 +81,9 @@ export class StorageService {
   /**
    * Delete multiple images
    */
-  static async deleteImages(imagePaths: string[]): Promise<void> {
+  static async deleteImages(imageUrls: string[]): Promise<void> {
     try {
-      const deletePromises = imagePaths.map(path => this.deleteImage(path));
+      const deletePromises = imageUrls.map(url => this.deleteImage(url));
       await Promise.all(deletePromises);
     } catch (error) {
       console.error('Error deleting multiple images:', error);

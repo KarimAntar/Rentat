@@ -32,6 +32,7 @@
     "@react-navigation/native-stack": "^6.9.17",
     "@react-navigation/stack": "^6.3.29",
     "@stripe/stripe-js": "^2.4.0",
+    "@vercel/blob": "^2.0.0",
     "expo": "~49.0.15",
     "expo-constants": "~14.4.2",
     "expo-image-picker": "~14.3.2",
