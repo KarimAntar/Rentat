@@ -1,16 +1,14 @@
-import { put, del } from '@vercel/blob';
-
 export interface ImageUploadResult {
   url: string;
   path: string;
 }
 
-// Get Vercel Blob token from environment or config
-const BLOB_READ_WRITE_TOKEN = process.env.EXPO_PUBLIC_BLOB_READ_WRITE_TOKEN || '';
+// API base URL - uses relative path for same-origin requests
+const API_BASE_URL = '/api';
 
 export class StorageService {
   /**
-   * Upload an image to Vercel Blob
+   * Upload an image to Vercel Blob via API endpoint
    */
   static async uploadImage(
     uri: string,
@@ -29,11 +27,21 @@ export class StorageService {
       const response = await fetch(uri);
       const blob = await response.blob();
       
-      // Upload to Vercel Blob
-      const result = await put(path, blob, {
-        access: 'public',
-        token: BLOB_READ_WRITE_TOKEN,
-      });
+      // Upload via API endpoint
+      const uploadResponse = await fetch(
+        `${API_BASE_URL}/upload?filename=${encodeURIComponent(path)}&contentType=${encodeURIComponent(blob.type)}`,
+        {
+          method: 'POST',
+          body: blob,
+        }
+      );
+      
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+      
+      const result = await uploadResponse.json();
       
       return {
         url: result.url,
@@ -65,13 +73,21 @@ export class StorageService {
   }
 
   /**
-   * Delete an image from Vercel Blob
+   * Delete an image from Vercel Blob via API endpoint
    */
   static async deleteImage(imageUrl: string): Promise<void> {
     try {
-      await del(imageUrl, {
-        token: BLOB_READ_WRITE_TOKEN,
-      });
+      const deleteResponse = await fetch(
+        `${API_BASE_URL}/delete?url=${encodeURIComponent(imageUrl)}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      
+      if (!deleteResponse.ok) {
+        const error = await deleteResponse.json();
+        throw new Error(error.message || 'Delete failed');
+      }
     } catch (error) {
       console.error('Error deleting image:', error);
       throw new Error('Failed to delete image');

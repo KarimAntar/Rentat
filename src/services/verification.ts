@@ -7,13 +7,12 @@ import {
   serverTimestamp,
   runTransaction
 } from 'firebase/firestore';
-import { put, del } from '@vercel/blob';
 import { db, collections } from '../config/firebase';
 import { User, UserVerification } from '../types';
 import { authService } from './auth';
 
-// Get Vercel Blob token from environment or config
-const BLOB_READ_WRITE_TOKEN = process.env.EXPO_PUBLIC_BLOB_READ_WRITE_TOKEN || '';
+// API base URL - uses relative path for same-origin requests
+const API_BASE_URL = '/api';
 
 export interface VerificationDocument {
   id: string;
@@ -109,7 +108,7 @@ export class VerificationService {
     }
   }
 
-  // Upload verification image to Vercel Blob
+  // Upload verification image to Vercel Blob via API endpoint
   private async uploadVerificationImage(
     userId: string,
     type: 'front' | 'back' | 'selfie',
@@ -122,12 +121,21 @@ export class VerificationService {
       // Create unique filename
       const filename = `verification/${userId}/${type}_${Date.now()}.jpg`;
 
-      // Upload to Vercel Blob
-      const result = await put(filename, blob, {
-        access: 'public',
-        token: BLOB_READ_WRITE_TOKEN,
-      });
-
+      // Upload via API endpoint
+      const uploadResponse = await fetch(
+        `${API_BASE_URL}/upload?filename=${encodeURIComponent(filename)}&contentType=${encodeURIComponent(blob.type)}`,
+        {
+          method: 'POST',
+          body: blob,
+        }
+      );
+      
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+      
+      const result = await uploadResponse.json();
       return result.url;
     } catch (error) {
       console.error('Error uploading verification image:', error);
@@ -340,10 +348,20 @@ export class VerificationService {
   // Delete verification images (for privacy/cleanup)
   public async deleteVerificationImages(imageUrls: string[]): Promise<void> {
     try {
-      // Delete each image URL from Vercel Blob
-      const deletePromises = imageUrls.map(url => 
-        del(url, { token: BLOB_READ_WRITE_TOKEN })
-      );
+      // Delete each image URL via API endpoint
+      const deletePromises = imageUrls.map(async (url) => {
+        const deleteResponse = await fetch(
+          `${API_BASE_URL}/delete?url=${encodeURIComponent(url)}`,
+          {
+            method: 'DELETE',
+          }
+        );
+        
+        if (!deleteResponse.ok) {
+          const error = await deleteResponse.json();
+          throw new Error(error.message || 'Delete failed');
+        }
+      });
       
       await Promise.all(deletePromises);
       
